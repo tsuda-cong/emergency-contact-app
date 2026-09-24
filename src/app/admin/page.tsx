@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, formatDateTime, formatPhones, maskAddress } from "@/lib/format";
+import { formatPhones } from "@/lib/format";
 import { FormOpenToggle } from "./FormOpenToggle";
 import { IssueLinkButton } from "./IssueLinkButton";
 
@@ -18,14 +18,34 @@ type HouseholdListRow = {
   id: string;
   name: string;
   name_kana: string;
-  birthdate: string;
-  address: string;
   phones: string[];
-  created_at: string;
-  updated_at: string;
-  cohabitants: { count: number }[];
-  emergency_contacts: { count: number }[];
+  cohabitants: { name: string; phone: string | null }[];
+  emergency_contacts: { name: string; phones: string[] }[];
 };
+
+// 同居人・緊急連絡先は1人目だけを表示し、2人目以降は「他n人」とだけ示す（全員分は詳細画面で確認）
+function FirstPerson({
+  people,
+  phone,
+}: {
+  people: { name: string }[];
+  phone: string;
+}) {
+  if (people.length === 0) {
+    return <span className="text-slate-400">-</span>;
+  }
+  return (
+    <>
+      <div className="text-slate-900">
+        {people[0].name}
+        {people.length > 1 && (
+          <span className="ml-1.5 text-xs text-slate-500">他{people.length - 1}人</span>
+        )}
+      </div>
+      <div className="whitespace-nowrap text-xs text-slate-500">{phone}</div>
+    </>
+  );
+}
 
 export default async function AdminHouseholdsPage({
   searchParams,
@@ -58,9 +78,11 @@ export default async function AdminHouseholdsPage({
   let query = supabase
     .from("households")
     .select(
-      "id, name, name_kana, birthdate, address, phones, created_at, updated_at, cohabitants(count), emergency_contacts(count)"
+      "id, name, name_kana, phones, cohabitants(name, phone, sort_order), emergency_contacts(name, phones, sort_order)"
     )
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .order("sort_order", { referencedTable: "cohabitants" })
+    .order("sort_order", { referencedTable: "emergency_contacts" });
 
   if (q.trim()) {
     query = query.ilike("name", `%${q.trim()}%`);
@@ -140,54 +162,60 @@ export default async function AdminHouseholdsPage({
           <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
             <tr>
               <th className="px-4 py-2">氏名／ふりがな</th>
-              <th className="px-4 py-2">生年月日</th>
-              <th className="px-4 py-2">回答日時</th>
-              <th className="px-4 py-2">最終更新日時</th>
-              <th className="px-4 py-2">住所・電話番号</th>
-              <th className="px-4 py-2">同居人／緊急連絡先</th>
+              <th className="px-4 py-2">電話番号</th>
+              <th className="px-4 py-2">同居人</th>
+              <th className="px-4 py-2">緊急連絡先</th>
               <th className="px-4 py-2">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {households.map((h) => (
-              <tr key={h.id}>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-slate-900">{h.name}</div>
-                  <div className="text-xs text-slate-500">{h.name_kana}</div>
-                </td>
-                <td className="px-4 py-3 text-slate-700">{formatDate(h.birthdate)}</td>
-                <td className="px-4 py-3 text-slate-700">{formatDateTime(h.created_at)}</td>
-                <td className="px-4 py-3 text-slate-700">{formatDateTime(h.updated_at)}</td>
-                <td className="px-4 py-3 text-slate-700">
-                  <div>{maskAddress(h.address)}</div>
-                  <div className="text-xs text-slate-500">{formatPhones(h.phones)}</div>
-                </td>
-                <td className="px-4 py-3 text-slate-700">
-                  {h.cohabitants?.[0]?.count ?? 0}人 ／ {h.emergency_contacts?.[0]?.count ?? 0}件
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-col items-start gap-2">
-                    <Link href={`/admin/households/${h.id}`} className="text-sm text-blue-700 hover:underline">
-                      詳細を見る
-                    </Link>
-                    {isEditor && (
-                      <>
-                        <Link
-                          href={`/admin/households/${h.id}/edit`}
-                          className="text-sm text-blue-700 hover:underline"
-                        >
-                          編集
-                        </Link>
-                        <IssueLinkButton kind="update" householdId={h.id} />
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {households.map((h) => {
+              const cohabitants = h.cohabitants ?? [];
+              const contacts = h.emergency_contacts ?? [];
+              return (
+                <tr key={h.id}>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-slate-900">{h.name}</div>
+                    <div className="text-xs text-slate-500">{h.name_kana}</div>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                    {(h.phones ?? []).filter(Boolean).map((p) => (
+                      <div key={p}>{p}</div>
+                    ))}
+                  </td>
+                  <td className="px-4 py-3">
+                    <FirstPerson
+                      people={cohabitants}
+                      phone={cohabitants[0]?.phone || "（本人と同じ）"}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <FirstPerson people={contacts} phone={formatPhones(contacts[0]?.phones)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col items-start gap-2">
+                      <Link href={`/admin/households/${h.id}`} className="text-sm text-blue-700 hover:underline">
+                        詳細を見る
+                      </Link>
+                      {isEditor && (
+                        <>
+                          <Link
+                            href={`/admin/households/${h.id}/edit`}
+                            className="text-sm text-blue-700 hover:underline"
+                          >
+                            編集
+                          </Link>
+                          <IssueLinkButton kind="update" householdId={h.id} />
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {households.length === 0 && !error && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                   該当する回答がありません。
                 </td>
               </tr>

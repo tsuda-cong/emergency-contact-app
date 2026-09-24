@@ -18,11 +18,6 @@ export function formatDate(iso: string | null): string {
   }).format(new Date(iso));
 }
 
-export function maskAddress(address: string): string {
-  if (address.length <= 8) return address;
-  return `${address.slice(0, 8)}…`;
-}
-
 export function formatPhones(phones: string[] | null | undefined): string {
   if (!phones || phones.length === 0) return "-";
   const filtered = phones.filter(Boolean);
