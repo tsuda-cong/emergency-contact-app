@@ -9,11 +9,11 @@ import type { HouseholdFormValues, RegistrationPayload, Shelter } from "@/lib/ty
 type Stage = "loading" | "invalid" | "identity" | "edit";
 
 const INVALID_MESSAGES: Record<string, string> = {
-  not_found: "このリンクは無効です。長老にご連絡ください。",
-  used: "このリンクは無効です。長老にご連絡ください。",
-  locked: "このリンクは無効です。長老にご連絡ください。",
-  expired: "このリンクは無効です。長老にご連絡ください。",
-  invalid_link: "このリンクは無効です。長老にご連絡ください。",
+  not_found: "このリンクは無効です。書記にご連絡ください。",
+  used: "このリンクは無効です。書記にご連絡ください。",
+  locked: "このリンクは無効です。書記にご連絡ください。",
+  expired: "このリンクは無効です。書記にご連絡ください。",
+  invalid_link: "このリンクは無効です。書記にご連絡ください。",
 };
 
 export function UpdateFlow({ token, shelters }: { token: string; shelters: Shelter[] }) {
@@ -62,7 +62,7 @@ export function UpdateFlow({ token, shelters }: { token: string; shelters: Shelt
           setStage("invalid");
           return;
         }
-        setIdentityError("確認できませんでした。長老にご連絡ください。");
+        setIdentityError("確認できませんでした。書記にご連絡ください。");
         return;
       }
 

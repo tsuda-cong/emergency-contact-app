@@ -25,7 +25,7 @@ export default async function FormPage() {
         </>
       ) : (
         <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-6 text-slate-700">
-          このフォームの受付は終了しました。登録を希望される方は長老にご連絡ください。
+          このフォームの受付は終了しました。登録を希望される方は書記にご連絡ください。
         </div>
       )}
     </main>

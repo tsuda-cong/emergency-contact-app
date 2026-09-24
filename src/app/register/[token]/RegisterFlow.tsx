@@ -8,7 +8,7 @@ import type { RegistrationPayload, Shelter } from "@/lib/types";
 
 type Stage = "loading" | "invalid" | "form";
 
-const INVALID_MESSAGE = "このリンクは無効です。長老にご連絡ください。";
+const INVALID_MESSAGE = "このリンクは無効です。書記にご連絡ください。";
 
 export function RegisterFlow({ token, shelters }: { token: string; shelters: Shelter[] }) {
   const [stage, setStage] = useState<Stage>("loading");
