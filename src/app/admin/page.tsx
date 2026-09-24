@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 type SortKey = "romaji" | "created" | "updated";
 
 const SORT_LABELS: Record<SortKey, string> = {
-  romaji: "ふりがな順",
+  romaji: "ローマ字順",
   created: "回答日時順",
   updated: "更新日時順",
 };
