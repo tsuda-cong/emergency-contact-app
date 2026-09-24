@@ -2,6 +2,7 @@
 
 import { HouseholdForm } from "@/components/HouseholdForm";
 import { createClient } from "@/lib/supabase/client";
+import { ALREADY_REGISTERED_MESSAGE } from "@/lib/messages";
 import type { RegistrationPayload, Shelter } from "@/lib/types";
 
 export function RegistrationFormClient({ shelters }: { shelters: Shelter[] }) {
@@ -14,6 +15,9 @@ export function RegistrationFormClient({ shelters }: { shelters: Shelter[] }) {
           ok: false,
           error: "このフォームの受付は終了しました。登録を希望される方は長老にご連絡ください。",
         };
+      }
+      if (error.message.includes("already_registered")) {
+        return { ok: false, error: ALREADY_REGISTERED_MESSAGE };
       }
       return { ok: false, error: error.message };
     }

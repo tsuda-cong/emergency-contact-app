@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { HouseholdForm } from "@/components/HouseholdForm";
+import { ALREADY_REGISTERED_MESSAGE } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/client";
 import type { RegistrationPayload, Shelter } from "@/lib/types";
 
@@ -34,6 +35,9 @@ export function RegisterFlow({ token, shelters }: { token: string; shelters: She
       if (data?.reason === "invalid_link") {
         setStage("invalid");
         return { ok: false, error: INVALID_MESSAGE };
+      }
+      if (data?.reason === "already_registered") {
+        return { ok: false, error: ALREADY_REGISTERED_MESSAGE };
       }
       return { ok: false, error: "送信に失敗しました。時間をおいて再度お試しください。" };
     }
