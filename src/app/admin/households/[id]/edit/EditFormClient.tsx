@@ -36,6 +36,7 @@ export function EditFormClient({
       initialValues={initialValues}
       submitLabel="更新を保存する"
       requireConsent={false}
+      cancelHref={`/admin/households/${householdId}`}
       onSubmit={handleSubmit}
     />
   );

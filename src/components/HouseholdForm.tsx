@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { kanaToRomaji, katakanaToHiragana } from "@/lib/kana-romaji";
 import { normalizeAddress, normalizePhone } from "@/lib/normalize";
 import type {
@@ -81,6 +82,8 @@ type Props = {
   initialValues?: HouseholdFormValues;
   submitLabel: string;
   requireConsent?: boolean;
+  // 指定すると送信ボタンの横に「キャンセル」（保存せずにこのURLへ戻る）を表示する
+  cancelHref?: string;
   onSubmit: (payload: RegistrationPayload) => Promise<{ ok: boolean; error?: string }>;
 };
 
@@ -146,6 +149,7 @@ export function HouseholdForm({
   initialValues,
   submitLabel,
   requireConsent = true,
+  cancelHref,
   onSubmit,
 }: Props) {
   const [values, setValues] = useState<HouseholdFormValues>(
@@ -473,13 +477,23 @@ export function HouseholdForm({
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-md bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-      >
-        {submitting ? "送信中…" : submitLabel}
-      </button>
+      <div className="flex gap-3">
+        {cancelHref && (
+          <Link
+            href={cancelHref}
+            className="w-1/3 rounded-md border border-slate-300 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            キャンセル
+          </Link>
+        )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex-1 rounded-md bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+        >
+          {submitting ? "送信中…" : submitLabel}
+        </button>
+      </div>
     </form>
   );
 }

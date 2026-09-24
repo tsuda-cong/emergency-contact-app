@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatDateTime, formatPhones } from "@/lib/format";
 import type { CohabitantRow, EmergencyContactRow, HouseholdRow, Shelter } from "@/lib/types";
+import { TrashActionButton } from "../../TrashActions";
 
 export const dynamic = "force-dynamic";
 
@@ -37,21 +38,54 @@ export default async function HouseholdDetailPage({
   const h = household as HouseholdRow;
   const shelterName = (shelters as Shelter[] | null)?.find((s) => s.id === h.shelter_id)?.name;
 
+  const isDeleted = h.deleted_at !== null;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Link href="/admin" className="text-sm text-blue-700 hover:underline">
-          ← 一覧に戻る
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href={isDeleted ? "/admin/trash" : "/admin"}
+          className="text-sm text-blue-700 hover:underline"
+        >
+          {isDeleted ? "← 削除済み一覧に戻る" : "← 一覧に戻る"}
         </Link>
         {isEditor && (
-          <Link
-            href={`/admin/households/${id}/edit`}
-            className="rounded-md bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
-          >
-            編集
-          </Link>
+          <div className="flex items-center gap-2">
+            {isDeleted ? (
+              <>
+                <TrashActionButton action="restore" householdId={id} name={h.name} />
+                <TrashActionButton
+                  action="purge"
+                  householdId={id}
+                  name={h.name}
+                  redirectTo="/admin/trash"
+                />
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/admin/households/${id}/edit`}
+                  className="rounded-md bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
+                >
+                  編集
+                </Link>
+                <TrashActionButton
+                  action="delete"
+                  householdId={id}
+                  name={h.name}
+                  redirectTo="/admin"
+                />
+              </>
+            )}
+          </div>
         )}
       </div>
+
+      {isDeleted && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          この回答は削除済みです（{formatDateTime(h.deleted_at)}）。一覧・PDFには表示されません。
+        </div>
+      )}
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-slate-900">本人情報</h2>

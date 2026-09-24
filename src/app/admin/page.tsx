@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatDateTime, formatPhones, maskAddress } from "@/lib/format";
+import { FormOpenToggle } from "./FormOpenToggle";
 import { IssueLinkButton } from "./IssueLinkButton";
 
 export const dynamic = "force-dynamic";
@@ -46,11 +47,20 @@ export default async function AdminHouseholdsPage({
     .single();
   const isEditor = profile?.role === "editor";
 
+  const [{ data: settings }, { count: trashCount }] = await Promise.all([
+    supabase.from("settings").select("form_open").eq("id", 1).maybeSingle(),
+    supabase
+      .from("households")
+      .select("id", { count: "exact", head: true })
+      .not("deleted_at", "is", null),
+  ]);
+
   let query = supabase
     .from("households")
     .select(
       "id, name, name_kana, birthdate, address, phones, created_at, updated_at, cohabitants(count), emergency_contacts(count)"
-    );
+    )
+    .is("deleted_at", null);
 
   if (q.trim()) {
     query = query.ilike("name", `%${q.trim()}%`);
@@ -69,15 +79,27 @@ export default async function AdminHouseholdsPage({
 
   return (
     <div>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <FormOpenToggle formOpen={settings?.form_open ?? false} isEditor={isEditor} />
+        {isEditor && <IssueLinkButton kind="register" />}
+      </div>
+
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-lg font-bold text-slate-900">回答一覧（{households.length}件）</h1>
-        <Link
-          href="/admin/print"
-          target="_blank"
-          className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200"
-        >
-          PDF出力（印刷用ビュー）
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {isEditor && (
+            <Link href="/admin/trash" className="text-sm text-slate-600 hover:underline">
+              削除済み（{trashCount ?? 0}件）
+            </Link>
+          )}
+          <Link
+            href="/admin/print"
+            target="_blank"
+            className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200"
+          >
+            PDF出力（印刷用ビュー）
+          </Link>
+        </div>
       </div>
 
       <form className="mb-4 flex flex-wrap items-center gap-3" method="get">
@@ -156,7 +178,7 @@ export default async function AdminHouseholdsPage({
                         >
                           編集
                         </Link>
-                        <IssueLinkButton householdId={h.id} />
+                        <IssueLinkButton kind="update" householdId={h.id} />
                       </>
                     )}
                   </div>

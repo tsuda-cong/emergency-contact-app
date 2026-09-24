@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export function IssueLinkButton({ householdId }: { householdId: string }) {
+type Props =
+  | { kind: "update"; householdId: string }
+  | { kind: "register" };
+
+export function IssueLinkButton(props: Props) {
   const [issuedUrl, setIssuedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -15,15 +19,19 @@ export function IssueLinkButton({ householdId }: { householdId: string }) {
     setCopied(false);
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.rpc("issue_update_token", {
-        p_household_id: householdId,
-        p_days_valid: 14,
-      });
+      const { data, error } =
+        props.kind === "update"
+          ? await supabase.rpc("issue_update_token", {
+              p_household_id: props.householdId,
+              p_days_valid: 14,
+            })
+          : await supabase.rpc("issue_registration_token", { p_days_valid: 14 });
       if (error || !data?.token) {
         setError("リンクの発行に失敗しました。");
         return;
       }
-      setIssuedUrl(`${window.location.origin}/update/${data.token}`);
+      const path = props.kind === "update" ? "update" : "register";
+      setIssuedUrl(`${window.location.origin}/${path}/${data.token}`);
     } finally {
       setLoading(false);
     }
@@ -40,9 +48,13 @@ export function IssueLinkButton({ householdId }: { householdId: string }) {
       <button
         onClick={handleIssue}
         disabled={loading}
-        className="text-sm text-blue-700 hover:underline disabled:opacity-60"
+        className={
+          props.kind === "update"
+            ? "text-sm text-blue-700 hover:underline disabled:opacity-60"
+            : "rounded-md bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-60"
+        }
       >
-        {loading ? "発行中…" : "更新リンクを発行"}
+        {loading ? "発行中…" : props.kind === "update" ? "更新リンクを発行" : "新規登録リンクを発行"}
       </button>
       {error && <p className="text-xs text-red-600">{error}</p>}
       {issuedUrl && (

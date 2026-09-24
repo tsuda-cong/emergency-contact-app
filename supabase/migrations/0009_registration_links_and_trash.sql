@@ -1,86 +1,40 @@
--- 緊急連絡先管理アプリ 初期スキーマ
---
--- このアプリは「奉仕報告管理」など既存のアプリと同じ Supabase プロジェクトに
--- 同居させる想定のため、専用スキーマ `emg` の中にすべてのテーブル・関数を作成する。
--- 既存アプリの public スキーマには一切変更を加えない。
---
--- 新規にセットアップする場合は、このファイルだけを実行すれば最新の構成になる
--- （0002 以降は既存環境を更新するための差分）。
---
--- Supabase の SQL Editor でこのファイルの内容をそのまま実行してください。
--- 実行後、Supabase ダッシュボードの
---   Project Settings > Data API > Exposed schemas
--- に "emg" を追加して保存する必要がある（PostgREST 経由でアクセス可能にするため）。
-
-create schema if not exists emg;
+-- 変更内容:
+--   1. 一斉収集リンク（/form）の受付・停止を切り替える設定テーブル emg.settings を追加
+--   2. 新規登録用の一度限りリンク（emg.registration_tokens）を追加
+--   3. 回答レコードの削除をゴミ箱方式にする（households.deleted_at）
+--      削除 → 復元 / 完全に削除
+--   4. 登録・上書き処理を内部ヘルパー関数に集約し、既存の RPC をそれを使う形に再定義
 
 -- =========================================================
--- テーブル定義
+-- 1. 受付設定（1行だけのテーブル）
 -- =========================================================
-
-create table if not exists emg.shelters (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  sort_order int not null default 0,
-  created_at timestamptz not null default now()
+create table if not exists emg.settings (
+  id int primary key default 1 check (id = 1),
+  form_open boolean not null default true,
+  updated_at timestamptz not null default now()
 );
 
-create table if not exists emg.households (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  name_kana text not null,
-  name_kana_romaji text not null,
-  address text not null,
-  -- 電話番号は最大2件まで。jsonb 配列（プレーンな文字列の配列）で保持する: ["090-...", "072-..."]
-  phones jsonb not null default '[]'::jsonb,
-  birthdate date not null,
-  shelter_id uuid references emg.shelters(id) on delete set null,
-  consent_at timestamptz not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  -- ゴミ箱（論理削除）。null 以外なら削除済み
-  deleted_at timestamptz,
-  constraint households_phones_max2 check (jsonb_array_length(phones) <= 2)
-);
+insert into emg.settings (id) values (1) on conflict (id) do nothing;
 
-create table if not exists emg.cohabitants (
-  id uuid primary key default gen_random_uuid(),
-  household_id uuid not null references emg.households(id) on delete cascade,
-  name text not null,
-  name_kana text not null,
-  relationship text not null,
-  phone text,
-  is_jw boolean not null default false,
-  sort_order int not null default 0
-);
+alter table emg.settings enable row level security;
 
-create table if not exists emg.emergency_contacts (
-  id uuid primary key default gen_random_uuid(),
-  household_id uuid not null references emg.households(id) on delete cascade,
-  name text not null,
-  name_kana text not null,
-  relationship text not null,
-  -- 電話番号は最大2件まで。jsonb 配列（プレーンな文字列の配列）で保持する
-  phones jsonb not null default '[]'::jsonb,
-  is_jw boolean not null default false,
-  sort_order int not null default 0,
-  constraint emergency_contacts_phones_max2 check (jsonb_array_length(phones) <= 2)
-);
+-- 受付状態は /form（未ログイン）でも参照するため誰でも参照可。変更は set_form_open() 経由のみ。
+drop policy if exists "emg_settings_select_all" on emg.settings;
+create policy "emg_settings_select_all" on emg.settings
+  for select using (true);
 
-create table if not exists emg.update_tokens (
-  id uuid primary key default gen_random_uuid(),
-  household_id uuid not null references emg.households(id) on delete cascade,
-  token text not null unique,
-  expires_at timestamptz not null,
-  used_at timestamptz,
-  verified_at timestamptz,
-  attempt_count int not null default 0,
-  locked_at timestamptz,
-  created_by uuid references auth.users(id),
-  created_at timestamptz not null default now()
-);
+grant select on emg.settings to anon, authenticated;
 
--- 新規登録用の一度限りリンク
+-- =========================================================
+-- 2. ゴミ箱（論理削除）
+-- =========================================================
+alter table emg.households add column if not exists deleted_at timestamptz;
+
+create index if not exists emg_households_deleted_at_idx on emg.households (deleted_at);
+
+-- =========================================================
+-- 3. 新規登録用の一度限りリンク
+-- =========================================================
 create table if not exists emg.registration_tokens (
   id uuid primary key default gen_random_uuid(),
   token text not null unique,
@@ -92,152 +46,18 @@ create table if not exists emg.registration_tokens (
   created_at timestamptz not null default now()
 );
 
--- 受付設定（1行だけのテーブル）。form_open が false の間は一斉収集リンク（/form）を停止する
-create table if not exists emg.settings (
-  id int primary key default 1 check (id = 1),
-  form_open boolean not null default true,
-  updated_at timestamptz not null default now()
-);
-
-insert into emg.settings (id) values (1) on conflict (id) do nothing;
-
--- このアプリ専用の担当者ロール。既存アプリの権限テーブルとは独立している。
-create table if not exists emg.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  display_name text,
-  role text not null default 'viewer' check (role in ('editor', 'viewer')),
-  created_at timestamptz not null default now()
-);
-
-create index if not exists emg_households_name_kana_romaji_idx on emg.households (name_kana_romaji);
-create index if not exists emg_households_created_at_idx on emg.households (created_at);
-create index if not exists emg_households_updated_at_idx on emg.households (updated_at);
-create index if not exists emg_households_deleted_at_idx on emg.households (deleted_at);
-create index if not exists emg_cohabitants_household_id_idx on emg.cohabitants (household_id);
-create index if not exists emg_emergency_contacts_household_id_idx on emg.emergency_contacts (household_id);
-create index if not exists emg_update_tokens_household_id_idx on emg.update_tokens (household_id);
-
--- =========================================================
--- ロール判定ヘルパー関数
--- SECURITY DEFINER + search_path='' で固定し、テーブル参照は全てスキーマ修飾する
--- （search_path 汚染を避けるためのセキュリティ上の定石）。
--- =========================================================
-
-create or replace function emg.is_staff()
-returns boolean
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select exists (
-    select 1 from emg.profiles where id = auth.uid()
-  );
-$$;
-
-create or replace function emg.is_editor()
-returns boolean
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select exists (
-    select 1 from emg.profiles where id = auth.uid() and role = 'editor'
-  );
-$$;
-
-revoke execute on function emg.is_staff() from public;
-revoke execute on function emg.is_editor() from public;
-grant execute on function emg.is_staff() to authenticated;
-grant execute on function emg.is_editor() to authenticated;
-
--- =========================================================
--- 新規 Auth ユーザー作成時に emg.profiles を自動生成（既定ロール: viewer）
---
--- 注意: auth.users は Supabase プロジェクト全体で共有されるテーブルのため、
--- トリガー名・関数名は既存アプリ（例: 奉仕報告管理）のものと衝突しないよう
--- emg_ プレフィックスを付けている。既存アプリのトリガーには触れない。
---
--- 既にこのプロジェクトに登録済みの既存ユーザーにはこのトリガーは発火しない。
--- 既存メンバーを担当者にする場合は、本ファイル末尾のコメントを参照して
--- 手動で emg.profiles に行を追加すること。
--- =========================================================
-
-create or replace function emg.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  insert into emg.profiles (id, display_name, role)
-  values (new.id, coalesce(new.raw_user_meta_data->>'display_name', new.email), 'viewer')
-  on conflict (id) do nothing;
-  return new;
-end;
-$$;
-
-drop trigger if exists emg_on_auth_user_created on auth.users;
-create trigger emg_on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure emg.handle_new_user();
-
--- =========================================================
--- Row Level Security
--- =========================================================
-
-alter table emg.shelters enable row level security;
-alter table emg.households enable row level security;
-alter table emg.cohabitants enable row level security;
-alter table emg.emergency_contacts enable row level security;
-alter table emg.update_tokens enable row level security;
 alter table emg.registration_tokens enable row level security;
-alter table emg.settings enable row level security;
-alter table emg.profiles enable row level security;
-
--- shelters: 誰でも参照可（フォームのプルダウン用）
-drop policy if exists "emg_shelters_select_all" on emg.shelters;
-create policy "emg_shelters_select_all" on emg.shelters
-  for select using (true);
-
--- settings: 受付状態は /form（未ログイン）でも参照するため誰でも参照可。変更は set_form_open() 経由のみ
-drop policy if exists "emg_settings_select_all" on emg.settings;
-create policy "emg_settings_select_all" on emg.settings
-  for select using (true);
-
--- households / cohabitants / emergency_contacts / update_tokens / registration_tokens:
---   通常の insert/update/delete は許可しない。書き込みは全て SECURITY DEFINER 関数経由。
---   参照は担当者（editor/viewer 共通）のみ。
-drop policy if exists "emg_households_staff_select" on emg.households;
-create policy "emg_households_staff_select" on emg.households
-  for select using (emg.is_staff());
-
-drop policy if exists "emg_cohabitants_staff_select" on emg.cohabitants;
-create policy "emg_cohabitants_staff_select" on emg.cohabitants
-  for select using (emg.is_staff());
-
-drop policy if exists "emg_emergency_contacts_staff_select" on emg.emergency_contacts;
-create policy "emg_emergency_contacts_staff_select" on emg.emergency_contacts
-  for select using (emg.is_staff());
-
-drop policy if exists "emg_update_tokens_staff_select" on emg.update_tokens;
-create policy "emg_update_tokens_staff_select" on emg.update_tokens
-  for select using (emg.is_staff());
 
 drop policy if exists "emg_registration_tokens_staff_select" on emg.registration_tokens;
 create policy "emg_registration_tokens_staff_select" on emg.registration_tokens
   for select using (emg.is_staff());
 
--- profiles: 担当者は全員分を参照可（少人数運用のため）
-drop policy if exists "emg_profiles_staff_select_all" on emg.profiles;
-create policy "emg_profiles_staff_select_all" on emg.profiles
-  for select using (emg.is_staff());
+grant select on emg.registration_tokens to authenticated;
 
 -- =========================================================
--- 内部ヘルパー関数
---   SECURITY INVOKER（既定）のため、直接呼ばれてもテーブルへの書き込み権限がなく失敗する。
---   さらに EXECUTE 権限も剥奪し、SECURITY DEFINER の RPC からのみ使う。
+-- 4. 内部ヘルパー関数
+--    SECURITY INVOKER（既定）のため、直接呼ばれてもテーブルへの書き込み権限がなく失敗する。
+--    さらに EXECUTE 権限も剥奪し、SECURITY DEFINER の RPC からのみ使う。
 -- =========================================================
 
 create or replace function emg._insert_members(p_household_id uuid, payload jsonb)
@@ -335,10 +155,10 @@ revoke execute on function emg._insert_household(jsonb) from public, anon, authe
 revoke execute on function emg._replace_household(uuid, jsonb) from public, anon, authenticated;
 
 -- =========================================================
--- 公開フォーム用 RPC（anon から実行可能、SECURITY DEFINER）
+-- 5. 公開 RPC（anon / authenticated）
 -- =========================================================
 
--- 一斉収集リンク（/form）からの新規登録（受付停止中は拒否）
+-- 一斉収集リンクからの新規登録（受付停止中は拒否）
 create or replace function emg.submit_registration(payload jsonb)
 returns uuid
 language plpgsql
@@ -411,7 +231,7 @@ begin
 end;
 $$;
 
--- 更新リンクの有効性チェック（有効な場合、確認画面に表示する氏名も返す。削除済みの回答は無効扱い）
+-- 更新リンクの有効性チェック（削除済みの回答は無効扱い）
 create or replace function emg.verify_update_token(p_token text)
 returns jsonb
 language plpgsql
@@ -443,9 +263,6 @@ begin
 end;
 $$;
 
--- 本人確認（生年月日の一致判定、試行回数制限あり）
--- 更新リンクは担当者が対象者ごとに個別発行するため宛先は既知。
--- 確認画面には氏名を表示するのみ（編集不可）とし、入力は生年月日のみを求める。
 create or replace function emg.confirm_update_identity(p_token text, p_birthdate date)
 returns jsonb
 language plpgsql
@@ -503,7 +320,6 @@ begin
 end;
 $$;
 
--- 個別更新の反映（本人確認済みトークンのみ、30分以内）
 create or replace function emg.submit_update(p_token text, payload jsonb)
 returns jsonb
 language plpgsql
@@ -545,11 +361,6 @@ revoke execute on function emg.verify_update_token(text) from public;
 revoke execute on function emg.confirm_update_identity(text, date) from public;
 revoke execute on function emg.submit_update(text, jsonb) from public;
 
--- authenticated にも許可する理由: これらの関数はトークン/本人確認自体が
--- セキュリティ境界であり、ロールで制御していない。担当者が管理画面に
--- ログインしたまま同じブラウザで更新リンクを開くと、Supabase クライアントは
--- ログインセッションの認証情報（authenticated）を優先して使うため、anon にしか
--- 許可していないと権限エラーになってしまう。
 grant execute on function emg.submit_registration(jsonb) to anon, authenticated;
 grant execute on function emg.verify_registration_token(text) to anon, authenticated;
 grant execute on function emg.submit_registration_with_token(text, jsonb) to anon, authenticated;
@@ -558,10 +369,9 @@ grant execute on function emg.confirm_update_identity(text, date) to anon, authe
 grant execute on function emg.submit_update(text, jsonb) to anon, authenticated;
 
 -- =========================================================
--- 担当者用 RPC（authenticated のみ実行可能、内部で is_editor() を検証）
+-- 6. 長老用 RPC（編集ロールのみ）
 -- =========================================================
 
--- 一斉収集リンク（/form）の受付・停止の切り替え
 create or replace function emg.set_form_open(p_open boolean)
 returns void
 language plpgsql
@@ -577,34 +387,6 @@ begin
 end;
 $$;
 
--- 更新リンクの発行
--- トークンは pgcrypto 等の拡張機能に依存せず、コア関数の gen_random_uuid() のみで生成する
--- （既存プロジェクトの拡張機能の状態に影響を与えない・依存しないため）。
-create or replace function emg.issue_update_token(p_household_id uuid, p_days_valid int default 14)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_token text;
-  v_expires_at timestamptz;
-begin
-  if not emg.is_editor() then
-    raise exception 'forbidden';
-  end if;
-
-  v_token := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
-  v_expires_at := now() + make_interval(days => p_days_valid);
-
-  insert into emg.update_tokens (household_id, token, expires_at, created_by)
-  values (p_household_id, v_token, v_expires_at, auth.uid());
-
-  return jsonb_build_object('token', v_token, 'expiresAt', v_expires_at);
-end;
-$$;
-
--- 新規登録リンクの発行
 create or replace function emg.issue_registration_token(p_days_valid int default 14)
 returns jsonb
 language plpgsql
@@ -629,7 +411,6 @@ begin
 end;
 $$;
 
--- 担当者による代理編集
 create or replace function emg.admin_update_household(p_household_id uuid, payload jsonb)
 returns jsonb
 language plpgsql
@@ -697,7 +478,6 @@ end;
 $$;
 
 revoke execute on function emg.set_form_open(boolean) from public;
-revoke execute on function emg.issue_update_token(uuid, int) from public;
 revoke execute on function emg.issue_registration_token(int) from public;
 revoke execute on function emg.admin_update_household(uuid, jsonb) from public;
 revoke execute on function emg.delete_household(uuid) from public;
@@ -705,43 +485,8 @@ revoke execute on function emg.restore_household(uuid) from public;
 revoke execute on function emg.purge_household(uuid) from public;
 
 grant execute on function emg.set_form_open(boolean) to authenticated;
-grant execute on function emg.issue_update_token(uuid, int) to authenticated;
 grant execute on function emg.issue_registration_token(int) to authenticated;
 grant execute on function emg.admin_update_household(uuid, jsonb) to authenticated;
 grant execute on function emg.delete_household(uuid) to authenticated;
 grant execute on function emg.restore_household(uuid) to authenticated;
 grant execute on function emg.purge_household(uuid) to authenticated;
-
--- =========================================================
--- スキーマ全体への使用権限
--- （テーブル/関数の個別 GRANT があっても、スキーマ自体への USAGE がないとアクセス不可）
--- =========================================================
-
-grant usage on schema emg to anon, authenticated;
-
--- テーブルへの直接 SELECT 権限
--- （RLS ポリシーとは別に、Postgres の基本的な GRANT が必要）
-grant select on emg.shelters to anon, authenticated;
-grant select on emg.settings to anon, authenticated;
-grant select on emg.households to authenticated;
-grant select on emg.cohabitants to authenticated;
-grant select on emg.emergency_contacts to authenticated;
-grant select on emg.update_tokens to authenticated;
-grant select on emg.registration_tokens to authenticated;
-grant select on emg.profiles to authenticated;
-
--- =========================================================
--- セットアップ後の手動作業（README参照）
---   1. Supabase ダッシュボード > Project Settings > Data API > Exposed schemas に
---      "emg" を追加して保存する
---   2. emg.shelters テーブルに対象地域の指定避難所を登録
---   3. 担当者にする既存メンバーについて、以下のように emg.profiles に登録する
---      （新規サインアップ時のトリガーは今後の新規ユーザーにしか効かないため、
---        既存ユーザーは手動登録が必要）:
---
---      insert into emg.profiles (id, display_name, role)
---      values ('<担当者のuser id>', '<表示名>', 'editor')
---      on conflict (id) do update set role = excluded.role;
---
---      user id は Authentication > Users の一覧から確認できる。
--- =========================================================

@@ -47,6 +47,10 @@ export default async function EditHouseholdPage({
 
   const h = household as HouseholdRow;
 
+  if (h.deleted_at) {
+    redirect(`/admin/households/${id}`);
+  }
+
   const initialValues: HouseholdFormValues = {
     name: h.name,
     nameKana: katakanaToHiragana(h.name_kana),

@@ -1,7 +1,7 @@
 # 緊急連絡先管理アプリ
 
 災害時などの緊急連絡先情報（本人・同居人・非同居の緊急連絡先）を収集・管理する Web アプリです。
-回答者はログイン不要（常設リンク、または長老発行の期限付き個別更新リンク）で回答・更新でき、
+回答者はログイン不要（一斉収集リンク、または長老発行の期限付きの新規登録リンク・個別更新リンク）で回答・更新でき、
 長老（編集ロール／閲覧ロール）は Supabase Auth でログインして管理画面を利用します。
 
 - フロントエンド: Next.js（App Router）+ TypeScript + Tailwind CSS
@@ -73,10 +73,13 @@ npm run dev
 
 http://localhost:3000 で確認できます。
 
-- `/form` … 常設の回答フォーム（誰でもアクセス可、常時受付）
+- `/` … 管理画面へ移動（未ログインならログイン画面）。回答者には案内しない
+- `/form` … 一斉収集リンク（誰でもアクセス可。管理画面で受付を停止できる）
+- `/register/[token]` … 長老が発行した期限付き・一度限りの新規登録リンク（一斉収集の停止後に使う）
+- `/update/[token]` … 長老が発行した期限付き・一度限りの個別更新リンク
 - `/admin/login` … 長老ログイン（「奉仕報告管理」と同じメールアドレス・パスワード）
-- `/admin` … 一覧・検索・並び替え・詳細・編集・更新リンク発行・PDF出力
-- `/update/[token]` … 長老が発行した期限付き個別更新リンク
+- `/admin` … 一覧・検索・並び替え・詳細・編集・削除・リンク発行・PDF出力
+- `/admin/trash` … 削除済みの回答（復元・完全削除）
 
 ### 7. Vercel へのデプロイ
 
@@ -89,11 +92,23 @@ http://localhost:3000 で確認できます。
 
 ## 権限設計（RLS）
 
-- `anon`（未ログインの回答者）: `emg.shelters` の参照と、公開フォーム用 RPC（`emg.submit_registration` / `emg.verify_update_token` / `emg.confirm_update_identity` / `emg.submit_update`）の実行のみ許可。テーブルへの直接アクセスは不可。
+- `anon`（未ログインの回答者）: `emg.shelters` / `emg.settings` の参照と、公開フォーム用 RPC（`emg.submit_registration` / `emg.verify_registration_token` / `emg.submit_registration_with_token` / `emg.verify_update_token` / `emg.confirm_update_identity` / `emg.submit_update`）の実行のみ許可。回答データのテーブルへの直接アクセスは不可。
 - `authenticated`（長老・閲覧ロール）: `emg` スキーマ内の各テーブルの参照が可能。
-- `authenticated`（長老・編集ロール）: 上記に加え、代理編集用 RPC（`emg.admin_update_household`）と更新リンク発行用 RPC（`emg.issue_update_token`）を実行可能。
+- `authenticated`（長老・編集ロール）: 上記に加え、代理編集（`emg.admin_update_household`）、リンク発行（`emg.issue_update_token` / `emg.issue_registration_token`）、受付の停止・再開（`emg.set_form_open`）、削除・復元・完全削除（`emg.delete_household` / `emg.restore_household` / `emg.purge_household`）の RPC を実行可能。
 
 ロールは `emg.profiles.role`（`editor` / `viewer`）で管理し、`emg.is_staff()` / `emg.is_editor()` という SECURITY DEFINER 関数を通じて RLS ポリシーから参照しています。このロールはこのアプリ専用で、「奉仕報告管理」側の権限とは独立しています。
+
+## 一斉収集リンクと新規登録リンク
+
+1. 最初の一斉収集では `/form` を全員に案内する（誰でも何度でも登録できる）
+2. 一斉収集がひと段落したら、編集ロールの長老が管理画面上部の「受付を停止する」を押す。以後 `/form` は「受付終了」と表示され、登録もDB側で拒否される（「受付を再開する」で戻せる）
+3. その後に新しく登録する人がいれば、管理画面の「新規登録リンクを発行」でその人専用のリンク（`/register/<token>`）を発行して送る（有効期限: 発行から14日、1回登録すると無効化）
+
+## 削除（ゴミ箱方式）
+
+- 詳細画面の「削除」で回答を削除済みに移す。一覧・PDF には表示されなくなり、その回答宛ての更新リンクも使えなくなる
+- 一覧画面の「削除済み」から「復元」で元に戻せる
+- 「完全に削除」すると、同居人・緊急連絡先・更新リンクも含めてデータベースから消去され、元に戻せない
 
 ## 個別更新リンクの仕組み
 
