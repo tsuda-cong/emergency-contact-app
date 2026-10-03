@@ -368,7 +368,7 @@ export function HouseholdForm({
       </section>
 
       <section className={sectionClass}>
-        <div className="mb-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-2 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold text-slate-900">緊急連絡先情報（非同居）</h2>
           <button
             type="button"
@@ -380,6 +380,9 @@ export function HouseholdForm({
             ＋緊急連絡先を追加
           </button>
         </div>
+        <p className="mb-4 text-sm text-slate-600">
+          緊急連絡先はエホバの証人でなくても構いません。同じ災害に被災しにくい別の地域にお住まいの方がいれば、その方をご登録ください。（近くにお住まいの方でも構いません）
+        </p>
         <div className="space-y-4">
           {values.emergencyContacts.map((c, i) => (
             <div key={i} className="rounded-md border border-slate-200 p-4">
