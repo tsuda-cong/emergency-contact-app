@@ -1,3 +1,4 @@
+import { type CircuitInfo, formatCircuitLine } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { PrintButton } from "./PrintButton";
 
@@ -64,6 +65,13 @@ function ContactRow({ p }: { p: Contact }) {
 
 export default async function AdminPrintPage() {
   const supabase = await createClient();
+  const { data: circuitInfo } = await supabase
+    .from("circuit_info")
+    .select("circuit_name, overseer_name, overseer_phone, overseer_email")
+    .eq("id", 1)
+    .maybeSingle();
+  const circuitLine = formatCircuitLine(circuitInfo as CircuitInfo | null);
+
   const { data } = await supabase
     .from("households")
     .select(
@@ -84,17 +92,29 @@ export default async function AdminPrintPage() {
         @page {
           size: A4 landscape;
           margin: 10mm;
+          @bottom-center {
+            content: counter(page) " / " counter(pages);
+            font-size: 8pt;
+            color: #475569;
+          }
+        }
+        @media print {
+          /* 1人分（1行）が2ページにまたがらないようにする */
+          tr, td {
+            break-inside: avoid;
+          }
         }
       `}</style>
       <div className="mb-4 flex items-center justify-between print:hidden">
         <h1 className="text-lg font-bold text-slate-900">一覧PDF出力プレビュー</h1>
         <PrintButton />
       </div>
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2 flex items-baseline gap-6">
         <h1 className="text-base font-bold text-slate-900">
           緊急連絡先 登録一覧　大阪府枚方市津田会衆（22046）
         </h1>
-        <span className="text-xs text-slate-600">{printedAt}</span>
+        {circuitLine && <span className="text-xs text-slate-800">{circuitLine}</span>}
+        <span className="ml-auto shrink-0 text-xs text-slate-600">{printedAt}</span>
       </div>
       <table className="w-full border-collapse text-[8pt]">
         <thead>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatPhones } from "@/lib/format";
+import { CircuitInfoForm } from "./CircuitInfoForm";
 import { FormOpenToggle } from "./FormOpenToggle";
 import { IssueLinkButton } from "./IssueLinkButton";
 
@@ -67,8 +68,13 @@ export default async function AdminHouseholdsPage({
     .single();
   const isEditor = profile?.role === "editor";
 
-  const [{ data: settings }, { count: trashCount }] = await Promise.all([
+  const [{ data: settings }, { data: circuitInfo }, { count: trashCount }] = await Promise.all([
     supabase.from("settings").select("form_open").eq("id", 1).maybeSingle(),
+    supabase
+      .from("circuit_info")
+      .select("circuit_name, overseer_name, overseer_phone, overseer_email")
+      .eq("id", 1)
+      .maybeSingle(),
     supabase
       .from("households")
       .select("id", { count: "exact", head: true })
@@ -104,6 +110,18 @@ export default async function AdminHouseholdsPage({
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <FormOpenToggle formOpen={settings?.form_open ?? false} isEditor={isEditor} />
         {isEditor && <IssueLinkButton kind="register" />}
+      </div>
+
+      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <CircuitInfoForm
+          initial={{
+            circuit_name: circuitInfo?.circuit_name ?? "",
+            overseer_name: circuitInfo?.overseer_name ?? "",
+            overseer_phone: circuitInfo?.overseer_phone ?? "",
+            overseer_email: circuitInfo?.overseer_email ?? "",
+          }}
+          isEditor={isEditor}
+        />
       </div>
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">

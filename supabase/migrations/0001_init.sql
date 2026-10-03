@@ -101,6 +101,19 @@ create table if not exists emg.settings (
 
 insert into emg.settings (id) values (1) on conflict (id) do nothing;
 
+-- PDF出力のタイトル行に表示する巡回区・巡回監督の連絡先（1行だけのテーブル）。
+-- 電話番号・メールアドレスを含むため、誰でも読める emg.settings とは分けて長老だけが参照できるようにする。
+create table if not exists emg.circuit_info (
+  id int primary key default 1 check (id = 1),
+  circuit_name text not null default '',
+  overseer_name text not null default '',
+  overseer_phone text not null default '',
+  overseer_email text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+insert into emg.circuit_info (id) values (1) on conflict (id) do nothing;
+
 -- このアプリ専用の担当者ロール。既存アプリの権限テーブルとは独立している。
 create table if not exists emg.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -194,6 +207,7 @@ alter table emg.emergency_contacts enable row level security;
 alter table emg.update_tokens enable row level security;
 alter table emg.registration_tokens enable row level security;
 alter table emg.settings enable row level security;
+alter table emg.circuit_info enable row level security;
 alter table emg.profiles enable row level security;
 
 -- shelters: 誰でも参照可（フォームのプルダウン用）
@@ -227,6 +241,10 @@ create policy "emg_update_tokens_staff_select" on emg.update_tokens
 
 drop policy if exists "emg_registration_tokens_staff_select" on emg.registration_tokens;
 create policy "emg_registration_tokens_staff_select" on emg.registration_tokens
+  for select using (emg.is_staff());
+
+drop policy if exists "emg_circuit_info_staff_select" on emg.circuit_info;
+create policy "emg_circuit_info_staff_select" on emg.circuit_info
   for select using (emg.is_staff());
 
 -- profiles: 担当者は全員分を参照可（少人数運用のため）
@@ -614,6 +632,33 @@ begin
 end;
 $$;
 
+-- 巡回区・巡回監督の連絡先の保存
+create or replace function emg.set_circuit_info(
+  p_circuit_name text,
+  p_overseer_name text,
+  p_overseer_phone text,
+  p_overseer_email text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not emg.is_editor() then
+    raise exception 'forbidden';
+  end if;
+
+  update emg.circuit_info set
+    circuit_name = coalesce(trim(p_circuit_name), ''),
+    overseer_name = coalesce(trim(p_overseer_name), ''),
+    overseer_phone = coalesce(trim(p_overseer_phone), ''),
+    overseer_email = coalesce(trim(p_overseer_email), ''),
+    updated_at = now()
+  where id = 1;
+end;
+$$;
+
 -- 更新リンクの発行
 -- トークンは pgcrypto 等の拡張機能に依存せず、コア関数の gen_random_uuid() のみで生成する
 -- （既存プロジェクトの拡張機能の状態に影響を与えない・依存しないため）。
@@ -734,6 +779,7 @@ end;
 $$;
 
 revoke execute on function emg.set_form_open(boolean) from public;
+revoke execute on function emg.set_circuit_info(text, text, text, text) from public;
 revoke execute on function emg.issue_update_token(uuid, int) from public;
 revoke execute on function emg.issue_registration_token(int) from public;
 revoke execute on function emg.admin_update_household(uuid, jsonb) from public;
@@ -742,6 +788,7 @@ revoke execute on function emg.restore_household(uuid) from public;
 revoke execute on function emg.purge_household(uuid) from public;
 
 grant execute on function emg.set_form_open(boolean) to authenticated;
+grant execute on function emg.set_circuit_info(text, text, text, text) to authenticated;
 grant execute on function emg.issue_update_token(uuid, int) to authenticated;
 grant execute on function emg.issue_registration_token(int) to authenticated;
 grant execute on function emg.admin_update_household(uuid, jsonb) to authenticated;
@@ -765,6 +812,7 @@ grant select on emg.cohabitants to authenticated;
 grant select on emg.emergency_contacts to authenticated;
 grant select on emg.update_tokens to authenticated;
 grant select on emg.registration_tokens to authenticated;
+grant select on emg.circuit_info to authenticated;
 grant select on emg.profiles to authenticated;
 
 -- =========================================================
