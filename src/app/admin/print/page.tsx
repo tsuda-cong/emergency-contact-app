@@ -34,32 +34,26 @@ function formatPhonesCompact(phones: string[] | null | undefined): string {
   return phones.filter(Boolean).join("/");
 }
 
-const cell = "px-1.5 py-1 align-top";
-
-function CohabitantRow({ p }: { p: Cohabitant }) {
-  return (
-    <div className="flex gap-1 whitespace-nowrap">
-      <span className="w-[100px] shrink-0">
-        {p.name}
-        {p.is_jw ? " JW" : ""}
-      </span>
-      <span className="w-[45px] shrink-0">{p.relationship}</span>
-      <span>{p.phone ?? ""}</span>
-    </div>
-  );
+function withJw(name: string, isJw: boolean): string {
+  return isJw ? `${name} JW` : name;
 }
 
-function ContactRow({ p }: { p: Contact }) {
+const cell = "px-1.5 py-1 align-top";
+// 同居人・緊急連絡先の各項目（氏名・続柄など）はそれぞれ独立した列にし、
+// 列幅を実際の文字の長さに合わせて自動で決める（固定幅だと長い名前が隣に重なるため）。
+// 1人1行で折り返さないので、同じ人の項目は横一列にそろう。
+const subFirst = "py-1 pl-1.5 pr-1 align-top whitespace-nowrap";
+const subMid = "py-1 px-1 align-top whitespace-nowrap";
+const subLast = "py-1 pl-1 pr-1.5 align-top whitespace-nowrap";
+
+function Lines({ values }: { values: string[] }) {
   return (
-    <div className="flex gap-1 whitespace-nowrap">
-      <span className="w-[100px] shrink-0">
-        {p.name}
-        {p.is_jw ? " JW" : ""}
-      </span>
-      <span className="w-[68px] shrink-0">{p.name_kana}</span>
-      <span className="w-[45px] shrink-0">{p.relationship}</span>
-      <span>{formatPhonesCompact(p.phones)}</span>
-    </div>
+    <>
+      {values.map((v, i) => (
+        // 空欄でも行の高さを保ち、同じ人の他の項目と横位置がずれないようにする
+        <div key={i}>{v || " "}</div>
+      ))}
+    </>
   );
 }
 
@@ -116,37 +110,56 @@ export default async function AdminPrintPage() {
         {circuitLine && <span className="text-xs text-slate-800">{circuitLine}</span>}
         <span className="ml-auto shrink-0 text-xs text-slate-600">{printedAt}</span>
       </div>
-      <table className="w-full border-collapse text-[8pt]">
+      <table className="w-full border-collapse text-[8pt] leading-[1.35]">
         <thead>
           <tr className="bg-slate-200 text-left">
-            <th className={`${cell} w-[9%]`}>氏名</th>
-            <th className={`${cell} w-[19%]`}>住所・電話番号</th>
-            <th className={`${cell} w-[26%]`}>同居人</th>
-            <th className={`${cell} w-[37%]`}>緊急連絡先</th>
-            <th className={`${cell} w-[9%]`}>指定避難場所</th>
+            <th className={cell}>氏名</th>
+            <th className={cell}>住所・電話番号</th>
+            <th className={cell} colSpan={3}>
+              同居人
+            </th>
+            <th className={cell} colSpan={4}>
+              緊急連絡先
+            </th>
+            <th className={cell}>指定避難場所</th>
           </tr>
         </thead>
         <tbody>
-          {households.map((h, i) => (
-            <tr key={h.id} className={i % 2 === 1 ? "bg-slate-100" : "bg-white"}>
-              <td className={cell}>{h.name}</td>
-              <td className={`${cell} whitespace-nowrap`}>
-                <div>{h.address}</div>
-                <div>{formatPhonesCompact(h.phones)}</div>
-              </td>
-              <td className={cell}>
-                {(h.cohabitants ?? []).map((p, idx) => (
-                  <CohabitantRow key={idx} p={p} />
-                ))}
-              </td>
-              <td className={cell}>
-                {(h.emergency_contacts ?? []).map((p, idx) => (
-                  <ContactRow key={idx} p={p} />
-                ))}
-              </td>
-              <td className={cell}>{h.shelters?.name ?? ""}</td>
-            </tr>
-          ))}
+          {households.map((h, i) => {
+            const cohabitants = h.cohabitants ?? [];
+            const contacts = h.emergency_contacts ?? [];
+            return (
+              <tr key={h.id} className={i % 2 === 1 ? "bg-slate-100" : "bg-white"}>
+                <td className={cell}>{h.name}</td>
+                <td className={cell}>
+                  <div>{h.address}</div>
+                  <div className="whitespace-nowrap">{formatPhonesCompact(h.phones)}</div>
+                </td>
+                <td className={subFirst}>
+                  <Lines values={cohabitants.map((p) => withJw(p.name, p.is_jw))} />
+                </td>
+                <td className={subMid}>
+                  <Lines values={cohabitants.map((p) => p.relationship)} />
+                </td>
+                <td className={subLast}>
+                  <Lines values={cohabitants.map((p) => p.phone ?? "")} />
+                </td>
+                <td className={subFirst}>
+                  <Lines values={contacts.map((p) => withJw(p.name, p.is_jw))} />
+                </td>
+                <td className={subMid}>
+                  <Lines values={contacts.map((p) => p.name_kana)} />
+                </td>
+                <td className={subMid}>
+                  <Lines values={contacts.map((p) => p.relationship)} />
+                </td>
+                <td className={subLast}>
+                  <Lines values={contacts.map((p) => formatPhonesCompact(p.phones))} />
+                </td>
+                <td className={cell}>{h.shelters?.name ?? ""}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
