@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatPhones } from "@/lib/format";
+import { normalizePhone } from "@/lib/normalize";
 import { CircuitInfoForm } from "./CircuitInfoForm";
 import { FormOpenToggle } from "./FormOpenToggle";
 import { IssueLinkButton } from "./IssueLinkButton";
+import { type PhoneFixes, PhoneFormatNotice } from "./PhoneFormatNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +22,39 @@ type HouseholdListRow = {
   name: string;
   name_kana: string;
   phones: string[];
-  cohabitants: { name: string; phone: string | null }[];
-  emergency_contacts: { name: string; phones: string[] }[];
+  cohabitants: { id: string; name: string; phone: string | null }[];
+  emergency_contacts: { id: string; name: string; phones: string[] }[];
 };
+
+// 書式がそろっていない電話番号を探し、そろえた後の値を求める
+function collectPhoneFixes(households: HouseholdListRow[]): { count: number; fixes: PhoneFixes } {
+  const fixes: PhoneFixes = { households: [], cohabitants: [], emergency_contacts: [] };
+  let count = 0;
+  const fixList = (phones: string[]) => {
+    const next = (phones ?? []).map(normalizePhone);
+    const changed = next.filter((p, i) => p !== phones[i]).length;
+    count += changed;
+    return changed > 0 ? next : null;
+  };
+
+  for (const h of households) {
+    const phones = fixList(h.phones);
+    if (phones) fixes.households.push({ id: h.id, phones });
+    for (const c of h.cohabitants ?? []) {
+      if (!c.phone) continue;
+      const phone = normalizePhone(c.phone);
+      if (phone !== c.phone) {
+        fixes.cohabitants.push({ id: c.id, phone });
+        count++;
+      }
+    }
+    for (const e of h.emergency_contacts ?? []) {
+      const phones = fixList(e.phones);
+      if (phones) fixes.emergency_contacts.push({ id: e.id, phones });
+    }
+  }
+  return { count, fixes };
+}
 
 // 同居人・緊急連絡先は1人目だけを表示し、2人目以降は「他n人」とだけ示す（全員分は詳細画面で確認）
 function FirstPerson({
@@ -84,7 +116,7 @@ export default async function AdminHouseholdsPage({
   let query = supabase
     .from("households")
     .select(
-      "id, name, name_kana, phones, cohabitants(name, phone, sort_order), emergency_contacts(name, phones, sort_order)"
+      "id, name, name_kana, phones, cohabitants(id, name, phone, sort_order), emergency_contacts(id, name, phones, sort_order)"
     )
     .is("deleted_at", null)
     .order("sort_order", { referencedTable: "cohabitants" })
@@ -104,9 +136,14 @@ export default async function AdminHouseholdsPage({
 
   const { data, error } = await query;
   const households = (data as HouseholdListRow[] | null) ?? [];
+  // 検索で絞り込んでいるときは一部しか対象にならないため、全件表示のときだけ案内する
+  const phoneFixes = isEditor && !q.trim() ? collectPhoneFixes(households) : null;
 
   return (
     <div>
+      {phoneFixes && phoneFixes.count > 0 && (
+        <PhoneFormatNotice count={phoneFixes.count} fixes={phoneFixes.fixes} />
+      )}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <FormOpenToggle formOpen={settings?.form_open ?? false} isEditor={isEditor} />
         {isEditor && <IssueLinkButton kind="register" />}

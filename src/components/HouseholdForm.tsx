@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { kanaToRomaji, katakanaToHiragana } from "@/lib/kana-romaji";
-import { normalizeAddress, normalizePhone } from "@/lib/normalize";
+import { isValidPhone, normalizeAddress, normalizePhone } from "@/lib/normalize";
 import type {
   CohabitantInput,
   EmergencyContactInput,
@@ -93,6 +93,43 @@ const inputClass = `w-full ${inputBaseClass}`;
 const labelClass = "block text-sm font-medium text-slate-700 mb-1";
 const sectionClass = "rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5";
 
+// 電話番号の入力欄。欄から離れたときに書式をそろえ、番号として成り立たない場合は注意を出す
+// （送信は止めない。番号の判定が新しい番号帯に追いついていない場合もあるため）。
+function PhoneInput({
+  value,
+  onChange,
+  required,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  className: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const showWarning = !editing && value.trim() !== "" && !isValidPhone(value);
+
+  return (
+    <div className="min-w-0 flex-1">
+      <input
+        className={`${className} ${showWarning ? "border-red-400" : ""}`}
+        type="tel"
+        required={required}
+        value={value}
+        onFocus={() => setEditing(true)}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={(e) => {
+          setEditing(false);
+          onChange(normalizePhone(e.target.value));
+        }}
+      />
+      {showWarning && (
+        <p className="mt-1 text-xs text-red-600">電話番号の桁数をご確認ください。</p>
+      )}
+    </div>
+  );
+}
+
 function PhoneFieldList({
   phones,
   onChange,
@@ -111,20 +148,18 @@ function PhoneFieldList({
       <label className={labelClass}>電話番号{required ? " *" : "（任意）"}</label>
       <div className="space-y-2">
         {phones.map((p, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              className={`${inputBaseClass} min-w-0 flex-1`}
-              type="tel"
+          <div key={i} className="flex items-start gap-2">
+            <PhoneInput
+              className={inputClass}
               required={required && i === 0}
               value={p}
-              onChange={(e) => updateAt(i, e.target.value)}
-              onBlur={(e) => updateAt(i, normalizePhone(e.target.value))}
+              onChange={(value) => updateAt(i, value)}
             />
             <button
               type="button"
               onClick={() => onChange(phones.filter((_, idx) => idx !== i))}
               disabled={required && phones.length <= 1}
-              className="shrink-0 text-sm text-red-600 hover:underline disabled:opacity-30"
+              className="shrink-0 py-2.5 text-sm text-red-600 hover:underline disabled:opacity-30"
             >
               削除
             </button>
@@ -350,12 +385,10 @@ export function HouseholdForm({
                 </div>
                 <div>
                   <label className={labelClass}>電話番号（本人と別の番号がある場合のみ）</label>
-                  <input
+                  <PhoneInput
                     className={inputClass}
-                    type="tel"
                     value={c.phone}
-                    onChange={(e) => updateCohabitant(i, { phone: e.target.value })}
-                    onBlur={(e) => updateCohabitant(i, { phone: normalizePhone(e.target.value) })}
+                    onChange={(phone) => updateCohabitant(i, { phone })}
                   />
                 </div>
               </div>
