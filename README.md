@@ -90,6 +90,10 @@ http://localhost:3000 で確認できます。
 3. Environment Variables に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 4. デプロイ
 
+## 対応ブラウザ
+
+Next.js 16 の標準の対応範囲は Safari 16.4 以降だが、回答者には古い iPhone の利用者もいるため、`package.json` の `browserslist` で iOS 15 の Safari まで対象を広げている（Next.js 本体のコードも含めて、iOS 15 で読める書き方に変換される）。iOS 15.0〜15.3 にない機能（`Array.prototype.at` など）は `src/instrumentation-client.ts` で補っている。
+
 ## 権限設計（RLS）
 
 - `anon`（未ログインの回答者）: `emg.shelters` / `emg.settings` の参照と、公開フォーム用 RPC（`emg.submit_registration` / `emg.verify_registration_token` / `emg.submit_registration_with_token` / `emg.verify_update_token` / `emg.confirm_update_identity` / `emg.submit_update`）の実行のみ許可。回答データのテーブルへの直接アクセスは不可。
