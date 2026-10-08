@@ -165,36 +165,10 @@ revoke execute on function emg.is_editor() from public;
 grant execute on function emg.is_staff() to authenticated;
 grant execute on function emg.is_editor() to authenticated;
 
--- =========================================================
--- 新規 Auth ユーザー作成時に emg.profiles を自動生成（既定ロール: viewer）
---
--- 注意: auth.users は Supabase プロジェクト全体で共有されるテーブルのため、
--- トリガー名・関数名は既存アプリ（例: 奉仕報告管理）のものと衝突しないよう
--- emg_ プレフィックスを付けている。既存アプリのトリガーには触れない。
---
--- 既にこのプロジェクトに登録済みの既存ユーザーにはこのトリガーは発火しない。
--- 既存メンバーを担当者にする場合は、本ファイル末尾のコメントを参照して
--- 手動で emg.profiles に行を追加すること。
--- =========================================================
-
-create or replace function emg.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  insert into emg.profiles (id, display_name, role)
-  values (new.id, coalesce(new.raw_user_meta_data->>'display_name', new.email), 'viewer')
-  on conflict (id) do nothing;
-  return new;
-end;
-$$;
-
-drop trigger if exists emg_on_auth_user_created on auth.users;
-create trigger emg_on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure emg.handle_new_user();
+-- 注意: 新しいログインアカウント（auth.users）を自動で emg.profiles に登録する仕組みは置かない。
+-- ログインアカウントは「奉仕報告管理」など同じプロジェクトの他のアプリと共通のため、
+-- 自動登録にすると、他のアプリの利用者にまで緊急連絡先の閲覧権限が付いてしまう。
+-- 長老は、本ファイル末尾のコメントを参照して SQL で1人ずつ登録する。
 
 -- =========================================================
 -- Row Level Security
@@ -220,9 +194,12 @@ drop policy if exists "emg_settings_select_all" on emg.settings;
 create policy "emg_settings_select_all" on emg.settings
   for select using (true);
 
--- households / cohabitants / emergency_contacts / update_tokens / registration_tokens:
+-- households / cohabitants / emergency_contacts:
 --   通常の insert/update/delete は許可しない。書き込みは全て SECURITY DEFINER 関数経由。
 --   参照は担当者（editor/viewer 共通）のみ。
+-- update_tokens / registration_tokens:
+--   ポリシーを置かず、長老も含めて誰も直接読めない（リンクの合言葉を閲覧ロールが使って
+--   内容を書き換えるのを防ぐ）。発行・利用はすべて SECURITY DEFINER 関数経由。
 drop policy if exists "emg_households_staff_select" on emg.households;
 create policy "emg_households_staff_select" on emg.households
   for select using (emg.is_staff());
@@ -233,14 +210,6 @@ create policy "emg_cohabitants_staff_select" on emg.cohabitants
 
 drop policy if exists "emg_emergency_contacts_staff_select" on emg.emergency_contacts;
 create policy "emg_emergency_contacts_staff_select" on emg.emergency_contacts
-  for select using (emg.is_staff());
-
-drop policy if exists "emg_update_tokens_staff_select" on emg.update_tokens;
-create policy "emg_update_tokens_staff_select" on emg.update_tokens
-  for select using (emg.is_staff());
-
-drop policy if exists "emg_registration_tokens_staff_select" on emg.registration_tokens;
-create policy "emg_registration_tokens_staff_select" on emg.registration_tokens
   for select using (emg.is_staff());
 
 drop policy if exists "emg_circuit_info_staff_select" on emg.circuit_info;
@@ -906,8 +875,7 @@ grant select on emg.settings to anon, authenticated;
 grant select on emg.households to authenticated;
 grant select on emg.cohabitants to authenticated;
 grant select on emg.emergency_contacts to authenticated;
-grant select on emg.update_tokens to authenticated;
-grant select on emg.registration_tokens to authenticated;
+-- update_tokens / registration_tokens には付けない（誰も直接読めないようにするため）
 grant select on emg.circuit_info to authenticated;
 grant select on emg.profiles to authenticated;
 
@@ -916,13 +884,14 @@ grant select on emg.profiles to authenticated;
 --   1. Supabase ダッシュボード > Project Settings > Data API > Exposed schemas に
 --      "emg" を追加して保存する
 --   2. emg.shelters テーブルに対象地域の指定避難所を登録
---   3. 担当者にする既存メンバーについて、以下のように emg.profiles に登録する
---      （新規サインアップ時のトリガーは今後の新規ユーザーにしか効かないため、
---        既存ユーザーは手動登録が必要）:
+--   3. 長老（担当者）にする人を、以下のように emg.profiles に1人ずつ登録する
+--      （自動登録の仕組みはないため、登録した人だけが管理画面を使える）:
 --
 --      insert into emg.profiles (id, display_name, role)
---      values ('<担当者のuser id>', '<表示名>', 'editor')
+--      values ('<担当者のuser id>', '<表示名>', 'editor')  -- 閲覧ロールは 'viewer'
 --      on conflict (id) do update set role = excluded.role;
 --
 --      user id は Authentication > Users の一覧から確認できる。
+--      退任時は delete from emg.profiles where id = '<user id>'; で外す
+--      （ログインアカウント自体は他のアプリと共通のため削除しない）。
 -- =========================================================

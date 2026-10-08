@@ -37,9 +37,9 @@ Supabase ダッシュボードの **Project Settings → Data API → Exposed sc
 
 ### 4. 長老アカウントの準備
 
-**「奉仕報告管理」で既にアカウントを持っているメンバーを長老にする場合**（今回のケース）:
+長老は、`emg.profiles` に1人ずつ登録した人だけが管理画面を使えます。ログインアカウントは「奉仕報告管理」と共通ですが、自動で登録される仕組みはありません（奉仕報告管理の利用者に、緊急連絡先の閲覧権限が勝手に付かないようにするため）。
 
-新規サインアップ時の自動登録トリガーは今後の新規ユーザーにしか効かないため、既存メンバーは手動で `emg.profiles` に登録します。SQL Editor で以下を実行してください（`<長老のuser id>` は Authentication → Users の一覧から取得できます）。
+SQL Editor で以下を実行してください（`<長老のuser id>` は Authentication → Users の一覧から取得できます。アカウントがまだない人は、先に同じ画面で作成してください）。
 
 ```sql
 insert into emg.profiles (id, display_name, role)
@@ -49,7 +49,11 @@ on conflict (id) do update set role = excluded.role;
 
 編集ロール1名、閲覧ロール数名分をそれぞれ実行してください。
 
-**新しくアカウントを作る場合**は、Supabase ダッシュボードの「Authentication」→「Users」からユーザーを作成すると、`emg.profiles` に自動的に `viewer` ロールで登録されます。編集ロールにする場合は上記と同様に SQL で `role` を更新してください。
+退任などで外すときは、次を実行します（ログインアカウント自体は奉仕報告管理と共通なので削除しません）。
+
+```sql
+delete from emg.profiles where id = '<長老のuser id>';
+```
 
 ### 5. ローカル環境変数の設定
 
@@ -97,7 +101,8 @@ Next.js 16 の標準の対応範囲は Safari 16.4 以降だが、回答者に�
 ## 権限設計（RLS）
 
 - `anon`（未ログインの回答者）: `emg.shelters` / `emg.settings` の参照と、公開フォーム用 RPC（`emg.submit_registration` / `emg.verify_registration_token` / `emg.submit_registration_with_token` / `emg.verify_update_token` / `emg.confirm_update_identity` / `emg.submit_update`）の実行のみ許可。回答データのテーブルへの直接アクセスは不可。
-- `authenticated`（長老・閲覧ロール）: `emg` スキーマ内の各テーブルの参照が可能。
+- `authenticated`（長老・閲覧ロール）: `emg` スキーマ内の各テーブルの参照が可能。ただし、更新リンク・新規登録リンクの合言葉の表（`emg.update_tokens` / `emg.registration_tokens`）は、編集ロールも含めて誰も直接読めない（閲覧ロールが他人の更新リンクで内容を書き換えるのを防ぐため）。
+- `emg.profiles` に登録されていないログインアカウント（奉仕報告管理だけの利用者など）は、何も読めない。
 - `authenticated`（長老・編集ロール）: 上記に加え、代理編集（`emg.admin_update_household`）、リンク発行（`emg.issue_update_token` / `emg.issue_registration_token`）、受付の停止・再開（`emg.set_form_open`）、削除・復元・完全削除（`emg.delete_household` / `emg.restore_household` / `emg.purge_household`）の RPC を実行可能。
 
 ロールは `emg.profiles.role`（`editor` / `viewer`）で管理し、`emg.is_staff()` / `emg.is_editor()` という SECURITY DEFINER 関数を通じて RLS ポリシーから参照しています。このロールはこのアプリ専用で、「奉仕報告管理」側の権限とは独立しています。
