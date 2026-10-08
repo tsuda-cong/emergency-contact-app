@@ -1,3 +1,4 @@
+import { FORM_CLOSED_MESSAGE } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/server";
 import type { Shelter } from "@/lib/types";
 import { RegistrationFormClient } from "./RegistrationFormClient";
@@ -17,15 +18,10 @@ export default async function FormPage() {
     <main className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="mb-2 text-xl font-bold text-slate-900">緊急連絡先情報の登録</h1>
       {formOpen ? (
-        <>
-          <p className="mb-8 text-sm text-slate-600">
-            本人・同居人・緊急連絡先の情報をご入力ください。
-          </p>
-          <RegistrationFormClient shelters={(shelters as Shelter[]) ?? []} />
-        </>
+        <RegistrationFormClient shelters={(shelters as Shelter[]) ?? []} />
       ) : (
         <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-6 text-slate-700">
-          このフォームの受付は終了しました。登録を希望される方は書記にご連絡ください。
+          {FORM_CLOSED_MESSAGE}
         </div>
       )}
     </main>

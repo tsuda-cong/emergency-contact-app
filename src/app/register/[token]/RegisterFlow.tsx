@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { HouseholdForm } from "@/components/HouseholdForm";
+import { RegistrationGate } from "@/components/RegistrationGate";
 import { ALREADY_REGISTERED_MESSAGE } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/client";
 import type { RegistrationPayload, Shelter } from "@/lib/types";
@@ -57,11 +57,11 @@ export function RegisterFlow({ token, shelters }: { token: string; shelters: She
   }
 
   return (
-    <>
-      <p className="mb-8 text-sm text-slate-600">
-        本人・同居人・緊急連絡先の情報をご入力ください。
-      </p>
-      <HouseholdForm shelters={shelters} submitLabel="送信する" onSubmit={handleSubmit} />
-    </>
+    <RegistrationGate
+      shelters={shelters}
+      token={token}
+      onSubmit={handleSubmit}
+      onInvalidLink={() => setStage("invalid")}
+    />
   );
 }

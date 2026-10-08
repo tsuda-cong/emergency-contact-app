@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BirthdateSelect } from "@/components/BirthdateSelect";
 import { HouseholdForm } from "@/components/HouseholdForm";
 import { createClient } from "@/lib/supabase/client";
 import { katakanaToHiragana } from "@/lib/kana-romaji";
@@ -139,12 +140,11 @@ export function UpdateFlow({ token, shelters }: { token: string; shelters: Shelt
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">生年月日</label>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base text-slate-900"
+          <BirthdateSelect
+            className="rounded-md border border-slate-300 px-3 py-2.5 text-base text-slate-900"
             required
-            type="date"
             value={birthdate}
-            onChange={(e) => setBirthdate(e.target.value)}
+            onChange={setBirthdate}
           />
         </div>
         {identityError && (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { BirthdateSelect } from "@/components/BirthdateSelect";
 import { kanaToRomaji, katakanaToHiragana } from "@/lib/kana-romaji";
 import { isValidPhone, normalizeAddress, normalizePhone } from "@/lib/normalize";
 import type {
@@ -286,12 +287,11 @@ export function HouseholdForm({
           />
           <div>
             <label className={labelClass}>生年月日 *</label>
-            <input
-              className={inputClass}
+            <BirthdateSelect
+              className={inputBaseClass}
               required
-              type="date"
               value={values.birthdate}
-              onChange={(e) => update("birthdate", e.target.value)}
+              onChange={(birthdate) => update("birthdate", birthdate)}
             />
           </div>
           <div className="sm:col-span-2">
