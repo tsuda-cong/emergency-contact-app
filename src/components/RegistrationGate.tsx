@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BirthdateSelect } from "@/components/BirthdateSelect";
 import { HouseholdForm, emptyHouseholdFormValues } from "@/components/HouseholdForm";
+import { LIMITS } from "@/lib/limits";
 import { ALREADY_REGISTERED_MESSAGE, FORM_CLOSED_MESSAGE } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/client";
 import type { RegistrationPayload, Shelter } from "@/lib/types";
@@ -114,7 +115,13 @@ export function RegistrationGate({
       </p>
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">氏名 *</label>
-        <input className={inputClass} required value={name} onChange={(e) => setName(e.target.value)} />
+        <input
+          className={inputClass}
+          required
+          maxLength={LIMITS.name}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">生年月日 *</label>

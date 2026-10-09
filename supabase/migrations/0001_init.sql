@@ -14,6 +14,22 @@
 
 create schema if not exists emg;
 
+-- 電話番号の配列（jsonb）が、文字列だけで各20文字以内か（テーブルの制約で使うため先に定義する）
+create or replace function emg._phones_within_limit(p_phones jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select jsonb_typeof(p_phones) = 'array'
+    and not exists (
+      select 1 from jsonb_array_elements(p_phones) as e(value)
+      where jsonb_typeof(e.value) <> 'string' or char_length(e.value #>> '{}') > 20
+    );
+$$;
+
+revoke execute on function emg._phones_within_limit(jsonb) from public, anon, authenticated;
+
 -- =========================================================
 -- テーブル定義
 -- =========================================================
@@ -40,7 +56,13 @@ create table if not exists emg.households (
   updated_at timestamptz not null default now(),
   -- ゴミ箱（論理削除）。null 以外なら削除済み
   deleted_at timestamptz,
-  constraint households_phones_max2 check (jsonb_array_length(phones) <= 2)
+  constraint households_phones_max2 check (jsonb_array_length(phones) <= 2),
+  -- 入力の上限（一斉収集リンクは誰でも送信できるため、極端な値を DB 側で防ぐ）
+  constraint households_name_len check (char_length(name) <= 30),
+  constraint households_name_kana_len check (char_length(name_kana) <= 60),
+  constraint households_name_kana_romaji_len check (char_length(name_kana_romaji) <= 200),
+  constraint households_address_len check (char_length(address) <= 100),
+  constraint households_phones_len check (emg._phones_within_limit(phones))
 );
 
 create table if not exists emg.cohabitants (
@@ -51,7 +73,11 @@ create table if not exists emg.cohabitants (
   relationship text not null,
   phone text,
   is_jw boolean not null default false,
-  sort_order int not null default 0
+  sort_order int not null default 0,
+  constraint cohabitants_name_len check (char_length(name) <= 30),
+  constraint cohabitants_name_kana_len check (char_length(name_kana) <= 60),
+  constraint cohabitants_relationship_len check (char_length(relationship) <= 20),
+  constraint cohabitants_phone_len check (phone is null or char_length(phone) <= 20)
 );
 
 create table if not exists emg.emergency_contacts (
@@ -64,7 +90,11 @@ create table if not exists emg.emergency_contacts (
   phones jsonb not null default '[]'::jsonb,
   is_jw boolean not null default false,
   sort_order int not null default 0,
-  constraint emergency_contacts_phones_max2 check (jsonb_array_length(phones) <= 2)
+  constraint emergency_contacts_phones_max2 check (jsonb_array_length(phones) <= 2),
+  constraint emergency_contacts_name_len check (char_length(name) <= 30),
+  constraint emergency_contacts_name_kana_len check (char_length(name_kana) <= 60),
+  constraint emergency_contacts_relationship_len check (char_length(relationship) <= 20),
+  constraint emergency_contacts_phones_len check (emg._phones_within_limit(phones))
 );
 
 create table if not exists emg.update_tokens (
@@ -235,6 +265,12 @@ as $$
 declare
   v_item jsonb;
 begin
+  -- 同居人・緊急連絡先の人数の上限（登録・更新・代理編集のすべてがこの関数を通る）
+  if jsonb_array_length(coalesce(payload->'cohabitants', '[]'::jsonb)) > 10
+     or jsonb_array_length(coalesce(payload->'emergencyContacts', '[]'::jsonb)) > 10 then
+    raise exception 'too_many_members';
+  end if;
+
   for v_item in select * from jsonb_array_elements(coalesce(payload->'cohabitants', '[]'::jsonb))
   loop
     insert into emg.cohabitants (household_id, name, name_kana, relationship, phone, is_jw, sort_order)

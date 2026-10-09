@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BirthdateSelect } from "@/components/BirthdateSelect";
 import { kanaToRomaji, katakanaToHiragana } from "@/lib/kana-romaji";
+import { LIMITS } from "@/lib/limits";
 import { isValidPhone, normalizeAddress, normalizePhone } from "@/lib/normalize";
 import type {
   CohabitantInput,
@@ -116,6 +117,7 @@ function PhoneInput({
         className={`${className} ${showWarning ? "border-red-400" : ""}`}
         type="tel"
         required={required}
+        maxLength={LIMITS.phone}
         value={value}
         onFocus={() => setEditing(true)}
         onChange={(e) => onChange(e.target.value)}
@@ -255,6 +257,7 @@ export function HouseholdForm({
             <input
               className={inputClass}
               required
+              maxLength={LIMITS.name}
               value={values.name}
               onChange={(e) => update("name", e.target.value)}
             />
@@ -264,6 +267,7 @@ export function HouseholdForm({
             <input
               className={inputClass}
               required
+              maxLength={LIMITS.nameKana}
               value={values.nameKana}
               onChange={(e) => update("nameKana", e.target.value)}
               onBlur={(e) => update("nameKana", katakanaToHiragana(e.target.value))}
@@ -275,6 +279,7 @@ export function HouseholdForm({
             <input
               className={inputClass}
               required
+              maxLength={LIMITS.address}
               value={values.address}
               onChange={(e) => update("address", e.target.value)}
               onBlur={(e) => update("address", normalizeAddress(e.target.value))}
@@ -315,15 +320,19 @@ export function HouseholdForm({
       <section className={sectionClass}>
         <div className="mb-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold text-slate-900">同居人情報</h2>
-          <button
-            type="button"
-            onClick={() =>
-              update("cohabitants", [...values.cohabitants, { ...EMPTY_COHABITANT }])
-            }
-            className="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
-          >
-            ＋同居人を追加
-          </button>
+          {values.cohabitants.length < LIMITS.members ? (
+            <button
+              type="button"
+              onClick={() =>
+                update("cohabitants", [...values.cohabitants, { ...EMPTY_COHABITANT }])
+              }
+              className="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+            >
+              ＋同居人を追加
+            </button>
+          ) : (
+            <span className="text-sm text-slate-500">登録できるのは{LIMITS.members}人までです</span>
+          )}
         </div>
         <div className="space-y-4">
           {values.cohabitants.map((c, i) => (
@@ -349,6 +358,7 @@ export function HouseholdForm({
                   <input
                     className={inputClass}
                     required
+                    maxLength={LIMITS.name}
                     value={c.name}
                     onChange={(e) => updateCohabitant(i, { name: e.target.value })}
                   />
@@ -358,6 +368,7 @@ export function HouseholdForm({
                   <input
                     className={inputClass}
                     required
+                    maxLength={LIMITS.nameKana}
                     value={c.nameKana}
                     onChange={(e) => updateCohabitant(i, { nameKana: e.target.value })}
                     onBlur={(e) => updateCohabitant(i, { nameKana: katakanaToHiragana(e.target.value) })}
@@ -369,6 +380,7 @@ export function HouseholdForm({
                   <input
                     className={inputClass}
                     required
+                    maxLength={LIMITS.relationship}
                     value={c.relationship}
                     onChange={(e) => updateCohabitant(i, { relationship: e.target.value })}
                   />
@@ -403,15 +415,19 @@ export function HouseholdForm({
       <section className={sectionClass}>
         <div className="mb-2 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold text-slate-900">緊急連絡先情報（非同居）</h2>
-          <button
-            type="button"
-            onClick={() =>
-              update("emergencyContacts", [...values.emergencyContacts, { ...EMPTY_CONTACT }])
-            }
-            className="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
-          >
-            ＋緊急連絡先を追加
-          </button>
+          {values.emergencyContacts.length < LIMITS.members ? (
+            <button
+              type="button"
+              onClick={() =>
+                update("emergencyContacts", [...values.emergencyContacts, { ...EMPTY_CONTACT }])
+              }
+              className="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+            >
+              ＋緊急連絡先を追加
+            </button>
+          ) : (
+            <span className="text-sm text-slate-500">登録できるのは{LIMITS.members}人までです</span>
+          )}
         </div>
         <p className="mb-4 text-sm text-slate-600">
           緊急連絡先はエホバの証人でなくても構いません。同じ災害に被災しにくい別の地域にお住まいの方がいれば、その方をご登録ください。（近くにお住まいの方でも構いません）
@@ -440,6 +456,7 @@ export function HouseholdForm({
                   <input
                     className={inputClass}
                     required
+                    maxLength={LIMITS.name}
                     value={c.name}
                     onChange={(e) => updateContact(i, { name: e.target.value })}
                   />
@@ -449,6 +466,7 @@ export function HouseholdForm({
                   <input
                     className={inputClass}
                     required
+                    maxLength={LIMITS.nameKana}
                     value={c.nameKana}
                     onChange={(e) => updateContact(i, { nameKana: e.target.value })}
                     onBlur={(e) => updateContact(i, { nameKana: katakanaToHiragana(e.target.value) })}
@@ -460,6 +478,7 @@ export function HouseholdForm({
                   <input
                     className={inputClass}
                     required
+                    maxLength={LIMITS.relationship}
                     value={c.relationship}
                     onChange={(e) => updateContact(i, { relationship: e.target.value })}
                   />
