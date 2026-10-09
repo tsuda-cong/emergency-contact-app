@@ -492,9 +492,11 @@ export function HouseholdForm({
 
       {requireConsent && (
         <section className={sectionClass}>
-          <p className="mb-3 text-sm text-slate-600">
-            この情報は長老団で共有され、緊急時に長老から直接連絡が入ることがあります。
-          </p>
+          <div className="mb-3 space-y-1 text-sm text-slate-600">
+            <p>この情報は長老団で共有され、緊急時に長老から直接連絡が入ることがあります。</p>
+            <p>緊急連絡先としてご登録いただく方には、登録することをお伝えください。</p>
+            <p>登録内容の変更や削除を希望される場合は、書記にご連絡ください。</p>
+          </div>
           <label className="flex items-start gap-2 text-sm text-slate-800">
             <input
               type="checkbox"
