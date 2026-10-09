@@ -101,7 +101,7 @@ export function UpdateFlow({ token, shelters }: { token: string; shelters: Shelt
     const supabase = createClient();
     const { data, error } = await supabase.rpc("submit_update", { p_token: token, payload });
     if (error) {
-      return { ok: false, error: error.message };
+      return { ok: false, error: "更新に失敗しました。時間をおいて再度お試しください。" };
     }
     if (!data?.ok) {
       if (data?.reason === "invalid_link") {

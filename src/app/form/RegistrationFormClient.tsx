@@ -2,7 +2,11 @@
 
 import { RegistrationGate } from "@/components/RegistrationGate";
 import { createClient } from "@/lib/supabase/client";
-import { ALREADY_REGISTERED_MESSAGE, FORM_CLOSED_MESSAGE } from "@/lib/messages";
+import {
+  ALREADY_REGISTERED_MESSAGE,
+  FORM_CLOSED_MESSAGE,
+  SUBMIT_FAILED_MESSAGE,
+} from "@/lib/messages";
 import type { RegistrationPayload, Shelter } from "@/lib/types";
 
 export function RegistrationFormClient({ shelters }: { shelters: Shelter[] }) {
@@ -16,7 +20,7 @@ export function RegistrationFormClient({ shelters }: { shelters: Shelter[] }) {
       if (error.message.includes("already_registered")) {
         return { ok: false, error: ALREADY_REGISTERED_MESSAGE };
       }
-      return { ok: false, error: error.message };
+      return { ok: false, error: SUBMIT_FAILED_MESSAGE };
     }
     return { ok: true };
   }

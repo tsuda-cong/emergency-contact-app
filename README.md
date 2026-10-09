@@ -98,6 +98,12 @@ http://localhost:3000 で確認できます。
 
 Next.js 16 の標準の対応範囲は Safari 16.4 以降だが、回答者には古い iPhone の利用者もいるため、`package.json` の `browserslist` で iOS 15 の Safari まで対象を広げている（Next.js 本体のコードも含めて、iOS 15 で読める書き方に変換される）。iOS 15.0〜15.3 にない機能（`Array.prototype.at` など）は `src/instrumentation-client.ts` で補っている。
 
+## セキュリティ用の応答ヘッダー
+
+`next.config.ts` で全ページに付けている。他サイトの枠への埋め込み禁止（`frame-ancestors 'none'` / `X-Frame-Options: DENY`）、他サイトへ移動元の URL を伝えない（`Referrer-Policy: same-origin`。リンクの URL に合言葉が含まれるため）、`X-Content-Type-Options: nosniff`、`Permissions-Policy`、HSTS。スクリプトを制限する本格的な CSP は、Next.js では調整が必要で画面が壊れるおそれがあるため入れていない。
+
+画面に出すエラーは `src/lib/messages.ts` の一般的な文言にし、データベースのエラー文（制約名など内部の名前を含む）はそのまま表示しない。
+
 ## 権限設計（RLS）
 
 - `anon`（未ログインの回答者）: `emg.shelters` / `emg.settings` の参照と、公開フォーム用 RPC（`emg.submit_registration` / `emg.verify_registration_token` / `emg.submit_registration_with_token` / `emg.verify_update_token` / `emg.confirm_update_identity` / `emg.submit_update`）の実行のみ許可。回答データのテーブルへの直接アクセスは不可。

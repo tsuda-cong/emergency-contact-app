@@ -2,6 +2,11 @@
 export const ALREADY_REGISTERED_MESSAGE =
   "すでに登録されています。内容を変更したい場合は書記にご連絡ください。";
 
+// 送信・読み込みに失敗したときのメッセージ。データベースのエラー文には内部の名前
+// （制約名など）が含まれるため、画面にはそのまま出さずにこちらを表示する。
+export const SUBMIT_FAILED_MESSAGE = "送信に失敗しました。時間をおいて再度お試しください。";
+export const LOAD_FAILED_MESSAGE = "読み込みに失敗しました。時間をおいて再度お試しください。";
+
 // 一斉収集リンクの受付を停止しているときのメッセージ
 export const FORM_CLOSED_MESSAGE =
   "このフォームの受付は終了しました。登録を希望される方は書記にご連絡ください。";

@@ -23,7 +23,7 @@ export function EditFormClient({
       payload,
     });
     if (error || !data?.ok) {
-      return { ok: false, error: error?.message ?? "更新に失敗しました。" };
+      return { ok: false, error: "更新に失敗しました。時間をおいて再度お試しください。" };
     }
     router.push(`/admin/households/${householdId}`);
     router.refresh();

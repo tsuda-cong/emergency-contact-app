@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { LOAD_FAILED_MESSAGE } from "@/lib/messages";
 import { TrashActionButton } from "../TrashActions";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function AdminTrashPage() {
 
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          読み込みに失敗しました: {error.message}
+          {LOAD_FAILED_MESSAGE}
         </div>
       )}
 

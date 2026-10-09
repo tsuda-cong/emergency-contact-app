@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatPhones } from "@/lib/format";
+import { LOAD_FAILED_MESSAGE } from "@/lib/messages";
 import { normalizePhone } from "@/lib/normalize";
 import { CircuitInfoForm } from "./CircuitInfoForm";
 import { FormOpenToggle } from "./FormOpenToggle";
@@ -209,7 +210,7 @@ export default async function AdminHouseholdsPage({
 
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          読み込みに失敗しました: {error.message}
+          {LOAD_FAILED_MESSAGE}
         </div>
       )}
 

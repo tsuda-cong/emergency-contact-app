@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RegistrationGate } from "@/components/RegistrationGate";
-import { ALREADY_REGISTERED_MESSAGE } from "@/lib/messages";
+import { ALREADY_REGISTERED_MESSAGE, SUBMIT_FAILED_MESSAGE } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/client";
 import type { RegistrationPayload, Shelter } from "@/lib/types";
 
@@ -29,7 +29,7 @@ export function RegisterFlow({ token, shelters }: { token: string; shelters: She
       payload,
     });
     if (error) {
-      return { ok: false, error: error.message };
+      return { ok: false, error: SUBMIT_FAILED_MESSAGE };
     }
     if (!data?.ok) {
       if (data?.reason === "invalid_link") {
@@ -39,7 +39,7 @@ export function RegisterFlow({ token, shelters }: { token: string; shelters: She
       if (data?.reason === "already_registered") {
         return { ok: false, error: ALREADY_REGISTERED_MESSAGE };
       }
-      return { ok: false, error: "送信に失敗しました。時間をおいて再度お試しください。" };
+      return { ok: false, error: SUBMIT_FAILED_MESSAGE };
     }
     return { ok: true };
   }
