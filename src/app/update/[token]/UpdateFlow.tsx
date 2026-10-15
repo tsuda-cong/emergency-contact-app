@@ -75,6 +75,7 @@ export function UpdateFlow({ token, shelters }: { token: string; shelters: Shelt
         phones: household.phones ?? [],
         birthdate: household.birthdate,
         shelterId: household.shelterId ?? "",
+        shelterOther: household.shelterOther ?? "",
         cohabitants: (data.cohabitants ?? []).map((c: Record<string, unknown>) => ({
           name: c.name as string,
           nameKana: katakanaToHiragana(c.name_kana as string),

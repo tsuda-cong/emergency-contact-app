@@ -6,6 +6,7 @@ export const LIMITS = {
   address: 100,
   relationship: 20,
   phone: 20,
+  shelterOther: 50,
   // 同居人・緊急連絡先は、それぞれ1世帯あたりこの人数まで
   members: 10,
 } as const;

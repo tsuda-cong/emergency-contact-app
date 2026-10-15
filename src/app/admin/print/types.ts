@@ -21,7 +21,13 @@ export type PrintHousehold = {
   cohabitants: PrintCohabitant[];
   emergency_contacts: PrintContact[];
   shelters: { name: string } | null;
+  shelter_other: string | null;
 };
+
+// 指定避難場所の表示名（リストから選んだもの、なければ自由記述）
+export function shelterLabel(h: Pick<PrintHousehold, "shelters" | "shelter_other">): string {
+  return h.shelters?.name ?? h.shelter_other ?? "";
+}
 
 export function formatPhonesCompact(phones: string[] | null | undefined): string {
   if (!phones || phones.length === 0) return "";

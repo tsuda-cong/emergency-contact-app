@@ -26,7 +26,9 @@ export type HouseholdFormValues = {
   address: string;
   phones: string[];
   birthdate: string;
+  // 指定避難場所。リストにない場合は shelterId を空にして shelterOther に自由記述する
   shelterId: string;
+  shelterOther: string;
   cohabitants: CohabitantInput[];
   emergencyContacts: EmergencyContactInput[];
   consent: boolean;
@@ -40,6 +42,7 @@ export type RegistrationPayload = {
   phones: string[];
   birthdate: string;
   shelterId: string;
+  shelterOther: string;
   consent: boolean;
   cohabitants: (CohabitantInput & { sortOrder: number })[];
   emergencyContacts: (EmergencyContactInput & { sortOrder: number })[];
@@ -54,6 +57,7 @@ export type HouseholdRow = {
   phones: string[];
   birthdate: string;
   shelter_id: string | null;
+  shelter_other: string | null;
   consent_at: string;
   created_at: string;
   updated_at: string;

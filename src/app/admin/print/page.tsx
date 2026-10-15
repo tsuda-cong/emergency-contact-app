@@ -34,7 +34,7 @@ export default async function AdminPrintPage({
   const { data } = await supabase
     .from("households")
     .select(
-      "id, name, address, phones, shelters(name), cohabitants(name, relationship, phone, is_jw, sort_order), emergency_contacts(name, name_kana, relationship, phones, is_jw, sort_order)"
+      "id, name, address, phones, shelter_other, shelters(name), cohabitants(name, relationship, phone, is_jw, sort_order), emergency_contacts(name, name_kana, relationship, phones, is_jw, sort_order)"
     )
     .is("deleted_at", null)
     .order("name_kana_romaji", { ascending: true })

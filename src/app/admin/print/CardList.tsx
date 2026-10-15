@@ -1,5 +1,5 @@
 import type { PrintHousehold } from "./types";
-import { formatPhonesCompact, withJw } from "./types";
+import { formatPhonesCompact, shelterLabel, withJw } from "./types";
 
 // カード形式（A4縦・2段組み）。1世帯＝1枚のカードで、ページをまたがない。
 // 段組み（CSS columns）で上から下へ詰めて並べるため、カードの高さがまちまちでも隙間が出にくい。
@@ -24,9 +24,9 @@ function HouseholdCard({ h }: { h: PrintHousehold }) {
     <div className="mb-1.5 break-inside-avoid rounded-md border border-slate-300 px-2 py-1.5">
       <div className="flex items-baseline justify-between gap-2 border-b border-slate-200 pb-0.5">
         <span className="text-[9.5pt] font-bold">{h.name}</span>
-        {h.shelters?.name && (
+        {shelterLabel(h) && (
           <span className="shrink-0 rounded-sm bg-slate-100 px-1.5 text-[7pt] text-slate-600">
-            {h.shelters.name}
+            {shelterLabel(h)}
           </span>
         )}
       </div>

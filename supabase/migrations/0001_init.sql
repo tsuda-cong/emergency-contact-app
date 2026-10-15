@@ -51,6 +51,8 @@ create table if not exists emg.households (
   phones jsonb not null default '[]'::jsonb,
   birthdate date not null,
   shelter_id uuid references emg.shelters(id) on delete set null,
+  -- 指定避難場所がリストにない場合の自由記述（shelter_id とは同時に入らない）
+  shelter_other text,
   consent_at timestamptz not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -62,6 +64,7 @@ create table if not exists emg.households (
   constraint households_name_kana_len check (char_length(name_kana) <= 60),
   constraint households_name_kana_romaji_len check (char_length(name_kana_romaji) <= 200),
   constraint households_address_len check (char_length(address) <= 100),
+  constraint households_shelter_other_len check (char_length(shelter_other) <= 50),
   constraint households_phones_len check (emg._phones_within_limit(phones))
 );
 
@@ -301,6 +304,18 @@ begin
 end;
 $$;
 
+-- 自由記述の指定避難場所。リストから選んでいる場合は入れない
+create or replace function emg._shelter_other(payload jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when nullif(payload->>'shelterId', '') is null then nullif(trim(payload->>'shelterOther'), '')
+  end;
+$$;
+
 create or replace function emg._insert_household(payload jsonb)
 returns uuid
 language plpgsql
@@ -310,7 +325,7 @@ declare
   v_household_id uuid;
 begin
   insert into emg.households (
-    name, name_kana, name_kana_romaji, address, phones, birthdate, shelter_id, consent_at
+    name, name_kana, name_kana_romaji, address, phones, birthdate, shelter_id, shelter_other, consent_at
   ) values (
     payload->>'name',
     payload->>'nameKana',
@@ -319,6 +334,7 @@ begin
     coalesce(payload->'phones', '[]'::jsonb),
     (payload->>'birthdate')::date,
     nullif(payload->>'shelterId', '')::uuid,
+    emg._shelter_other(payload),
     now()
   )
   returning id into v_household_id;
@@ -343,6 +359,7 @@ begin
     phones = coalesce(payload->'phones', '[]'::jsonb),
     birthdate = (payload->>'birthdate')::date,
     shelter_id = nullif(payload->>'shelterId', '')::uuid,
+    shelter_other = emg._shelter_other(payload),
     updated_at = now()
   where id = p_household_id;
 
@@ -394,6 +411,7 @@ revoke execute on function emg._phone_digits(jsonb) from public, anon, authentic
 revoke execute on function emg.normalize_name(text) from public, anon, authenticated;
 revoke execute on function emg._is_registered(jsonb) from public, anon, authenticated;
 revoke execute on function emg._insert_members(uuid, jsonb) from public, anon, authenticated;
+revoke execute on function emg._shelter_other(jsonb) from public, anon, authenticated;
 revoke execute on function emg._insert_household(jsonb) from public, anon, authenticated;
 revoke execute on function emg._replace_household(uuid, jsonb) from public, anon, authenticated;
 
@@ -590,7 +608,8 @@ begin
         'address', v_household.address,
         'phones', v_household.phones,
         'birthdate', v_household.birthdate,
-        'shelterId', v_household.shelter_id
+        'shelterId', v_household.shelter_id,
+        'shelterOther', v_household.shelter_other
       ),
       'cohabitants', v_cohabitants,
       'emergencyContacts', v_contacts

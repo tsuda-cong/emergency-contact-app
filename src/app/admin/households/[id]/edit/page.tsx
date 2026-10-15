@@ -58,6 +58,7 @@ export default async function EditHouseholdPage({
     phones: h.phones ?? [],
     birthdate: h.birthdate,
     shelterId: h.shelter_id ?? "",
+    shelterOther: h.shelter_other ?? "",
     consent: true,
     cohabitants: ((cohabitants as CohabitantRow[] | null) ?? []).map((c) => ({
       name: c.name,

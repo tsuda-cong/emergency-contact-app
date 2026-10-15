@@ -95,7 +95,10 @@ export default async function HouseholdDetailPage({
           <Field label="住所" value={h.address} />
           <Field label="電話番号" value={formatPhones(h.phones)} />
           <Field label="生年月日" value={formatDate(h.birthdate)} />
-          <Field label="指定避難場所" value={shelterName ?? "未選択"} />
+          <Field
+            label="指定避難場所"
+            value={shelterName ?? (h.shelter_other ? `${h.shelter_other}（リスト外）` : "未選択")}
+          />
           <Field label="回答日時" value={formatDateTime(h.created_at)} />
           <Field label="最終更新日時" value={formatDateTime(h.updated_at)} />
         </dl>

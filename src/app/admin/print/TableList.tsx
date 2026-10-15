@@ -1,5 +1,5 @@
 import type { PrintHousehold } from "./types";
-import { formatPhonesCompact, withJw } from "./types";
+import { formatPhonesCompact, shelterLabel, withJw } from "./types";
 
 const cell = "px-1.5 py-1 align-top";
 // 同居人・緊急連絡先の各項目（氏名・続柄など）はそれぞれ独立した列にし、
@@ -89,7 +89,7 @@ export function TableList({ households }: { households: PrintHousehold[] }) {
               <td className={subLast}>
                 <Lines values={contacts.map((p) => formatPhonesCompact(p.phones))} />
               </td>
-              <td className={`${cell} ${divider}`}>{h.shelters?.name ?? ""}</td>
+              <td className={`${cell} ${divider}`}>{shelterLabel(h)}</td>
             </tr>
           );
         })}

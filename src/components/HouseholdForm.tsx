@@ -40,11 +40,15 @@ export function emptyHouseholdFormValues(): HouseholdFormValues {
     phones: [""],
     birthdate: "",
     shelterId: "",
+    shelterOther: "",
     cohabitants: [],
     emergencyContacts: [],
     consent: false,
   };
 }
+
+// 指定避難場所の選択欄で「その他（リストにない）」を表す値。送信時には shelterId を空にする
+const SHELTER_OTHER = "__other__";
 
 function cleanPhones(phones: string[]): string[] {
   return phones.map((p) => normalizePhone(p.trim())).filter(Boolean);
@@ -58,7 +62,8 @@ export function toRegistrationPayload(values: HouseholdFormValues): Registration
     address: values.address.trim(),
     phones: cleanPhones(values.phones),
     birthdate: values.birthdate,
-    shelterId: values.shelterId,
+    shelterId: values.shelterId === SHELTER_OTHER ? "" : values.shelterId,
+    shelterOther: values.shelterId === SHELTER_OTHER ? values.shelterOther.trim() : "",
     consent: values.consent,
     cohabitants: values.cohabitants.map((c, i) => ({
       name: c.name.trim(),
@@ -190,9 +195,11 @@ export function HouseholdForm({
   cancelHref,
   onSubmit,
 }: Props) {
-  const [values, setValues] = useState<HouseholdFormValues>(
-    initialValues ?? emptyHouseholdFormValues()
-  );
+  const [values, setValues] = useState<HouseholdFormValues>(() => {
+    const v = initialValues ?? emptyHouseholdFormValues();
+    // 登録済みの自由記述がある場合は、選択欄を「その他」にした状態で始める
+    return !v.shelterId && v.shelterOther ? { ...v, shelterId: SHELTER_OTHER } : v;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -312,7 +319,19 @@ export function HouseholdForm({
                   {s.name}
                 </option>
               ))}
+              <option value={SHELTER_OTHER}>その他（リストにない）</option>
             </select>
+            {values.shelterId === SHELTER_OTHER && (
+              <input
+                className={`${inputClass} mt-2`}
+                required
+                maxLength={LIMITS.shelterOther}
+                value={values.shelterOther}
+                onChange={(e) => update("shelterOther", e.target.value)}
+                placeholder="指定避難場所の名前を入力してください"
+                aria-label="指定避難場所（その他）"
+              />
+            )}
           </div>
         </div>
       </section>
